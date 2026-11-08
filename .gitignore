@@ -1,0 +1,15 @@
+.tools/
+.build/
+bin/
+dist/
+evaluation/
+Data/
+*.tmp
+docs/reference/
+docs/evidence/automated/long-png/
+
+# Generated validation output may contain local filesystem paths.
+docs/evidence/
+.env
+.env.*
+!.env.example

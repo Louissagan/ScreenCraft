@@ -1,0 +1,36 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Windows.Forms;
+namespace Stackshot
+{
+    static class HotkeyInputTests
+    {
+        sealed class Input:HotkeyInput
+        {
+            public bool Press(Keys keys){var message=Message.Create(IntPtr.Zero,0x100,IntPtr.Zero,IntPtr.Zero);return ProcessCmdKey(ref message,keys);}
+            public void EnterField(){OnEnter(EventArgs.Empty);}
+        }
+        sealed class Registrar:IHotkeyRegistrar
+        {
+            public Dictionary<int,string> Registered=new Dictionary<int,string>();public int Attempts;public bool Reject;
+            public bool Register(int id,uint modifiers,Keys key){Attempts++;if(Reject)return false;Registered.Add(id,modifiers+":"+key);return true;}
+            public void Unregister(int id){Registered.Remove(id);}public void Dispose(){}
+        }
+        static IEnumerable<Control> Controls(Control parent){foreach(Control child in parent.Controls){yield return child;foreach(var nested in Controls(child))yield return nested;}}
+        static void Click(Button button){typeof(Button).GetMethod("OnClick",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(button,new object[]{EventArgs.Empty});}
+        public static void Run(Action<string,Action> run,Action<bool,string> check)
+        {
+            run("hotkey input/production key handler records chords instead of typing text",delegate{using(var input=new Input{Text="Ctrl+Alt+A"}){input.EnterField();check(input.Press(Keys.Control|Keys.Shift|Keys.F8),"not consumed");check(input.Text=="Ctrl+Shift+F8","chord not recorded");input.Press(Keys.Control|Keys.Shift|Keys.F8);check(input.Text=="Ctrl+Shift+F8","auto-repeat appended");input.Press(Keys.Alt|Keys.D4);check(input.Text=="Alt+4","digit formatting");}});
+            run("hotkey input/modifiers alone and unmodified letters never replace binding",delegate{using(var input=new Input{Text="Ctrl+Alt+A"}){string feedback=null;input.Feedback+=delegate(string s){feedback=s;};input.EnterField();foreach(var key in new[]{Keys.ControlKey,Keys.LShiftKey,Keys.RMenu,Keys.LWin,Keys.None})input.Press(key);check(input.Text=="Ctrl+Alt+A","partial modifier persisted");input.Press(Keys.R);check(input.Text=="Ctrl+Alt+A"&&feedback.Contains("请同时按"),"bare letter accepted without help");input.Press(Keys.Control|Keys.R);check(input.Text=="Ctrl+R"&&feedback.Contains("已录入"),"valid retry failed");}});
+            run("hotkey input/Delete Backspace clear and Escape restores field entry value",delegate{using(var input=new Input{Text="Ctrl+Alt+A"}){input.EnterField();input.Press(Keys.Control|Keys.F9);input.Press(Keys.Escape);check(input.Text=="Ctrl+Alt+A","Escape lost original");input.Press(Keys.Delete);check(input.Text=="","Delete did not disable");input.Press(Keys.Escape);check(input.Text=="Ctrl+Alt+A","clear cancellation");input.Press(Keys.Back);check(input.Text=="","Backspace did not disable");input.Press(Keys.Control|Keys.Delete);check(input.Text=="Ctrl+Delete","modified Delete incorrectly cleared");input.EnterField();input.Press(Keys.Alt|Keys.F10);input.Press(Keys.Escape);check(input.Text=="Ctrl+Delete","next edit session baseline");}});
+            run("hotkey input/Tab navigation preserved and modified navigation keys record",delegate{using(var input=new Input{Text="Ctrl+Alt+A"}){check(!input.RecordKey(Keys.Tab)&&!input.RecordKey(Keys.Shift|Keys.Tab),"Tab trapped");check(input.Text=="Ctrl+Alt+A","Tab changed value");check(input.Press(Keys.Control|Keys.Tab)&&input.Text=="Ctrl+Tab","modified Tab missing");input.Press(Keys.Alt|Keys.F4);check(input.Text=="Alt+F4","system chord fell through");}});
+            run("hotkey input/special key names roundtrip through production parser",delegate{using(var input=new Input()){foreach(var key in new[]{Keys.PrintScreen,Keys.Enter,Keys.PageUp,Keys.PageDown,Keys.CapsLock,Keys.NumPad7,Keys.OemSemicolon,Keys.Space,Keys.F12}){input.Press(Keys.Control|Keys.Shift|Keys.Alt|key);uint mods;Keys parsed;check(Hotkeys.TryParse(input.Text,out mods,out parsed)&&parsed==key&&mods==7,"cannot register recorded key "+input.Text);}}});
+            run("hotkey input/settings exposes ten global recorders and offers OCR language selection without free text",delegate{using(var settings=new SettingsDialog(new Preferences(),"fixture path",delegate{return "unused";})){settings.CreateControl();var all=Controls(settings).ToArray();var inputs=all.OfType<HotkeyInput>().Where(i=>!i.ToolShortcutMode).ToArray();check(inputs.Length==10&&inputs.All(i=>i.ReadOnly&&!i.ShortcutsEnabled&&i.ImeMode==ImeMode.Disable),"plain textbox remains");check(!all.OfType<TextBox>().Any(t=>(t.AccessibleName??"").StartsWith("OCR 语言"))&&all.OfType<PreferencesChoice>().Any(c=>c.AccessibleName=="OCR 语言"),"OCR language permits arbitrary input");check(all.OfType<Button>().Count(b=>b.Text=="清除")==10&&!settings.Visible,"clear controls or hidden boundary");check(!settings.RecordRegisteredShortcut(Keys.Control|Keys.Alt|Keys.A),"inactive dialog swallowed global key");}});
+            run("hotkey input/settings clear restore defaults and save use recorded values",delegate{Preferences saved=null;using(var settings=new SettingsDialog(new Preferences(),"fixture path",delegate(Preferences p){saved=p;return "fixture keeps hidden dialog open";})){var all=Controls(settings).ToArray();var capture=all.OfType<HotkeyInput>().Single(t=>t.AccessibleName=="区域截图");var ocr=all.OfType<HotkeyInput>().Single(t=>t.AccessibleName=="本地 OCR");capture.RecordKey(Keys.Control|Keys.Shift|Keys.F8);Click(all.OfType<Button>().Single(b=>b.AccessibleName=="清除本地 OCR"));Click(all.OfType<Button>().Single(b=>b.Text=="保存并应用"));check(saved!=null&&saved.Capture=="Ctrl+Shift+F8"&&saved.Ocr==""&&saved.Paste=="Ctrl+Alt+V","save missed recorded values");Click(all.OfType<Button>().Single(b=>b.Text=="恢复默认"));check(capture.Text=="Ctrl+Alt+A"&&ocr.Text=="Ctrl+Shift+O"&&!settings.Visible,"defaults or visible form");}});
+            run("hotkey input/owned registered shortcut routes into recorder without action or re-registration",delegate{var fake=new Registrar();using(var manager=new TransactionalHotkeys(fake))using(var input=new Input()){string error;check(manager.TryApply(new Dictionary<string,string>{{"ocr","Ctrl+Shift+O"}},out error),"registration fixture");int id=fake.Registered.Keys.Single(),actions=0;manager.Pressed+=delegate{actions++;};manager.CapturePressed=input.RecordKey;manager.Dispatch(id);check(input.Text=="Ctrl+Shift+O"&&actions==0&&fake.Attempts==1&&fake.Registered.Count==1,"recording triggered OCR or released original binding");manager.CapturePressed=null;manager.Dispatch(id);check(actions==1,"normal action did not resume");}});
+            run("hotkey input/recorded busy combination preserves previously registered binding",delegate{var fake=new Registrar();using(var manager=new TransactionalHotkeys(fake))using(var input=new Input()){string error;check(manager.TryApply(new Dictionary<string,string>{{"capture","Ctrl+Alt+A"}},out error),"initial");int id=fake.Registered.Keys.Single();input.Press(Keys.Control|Keys.Shift|Keys.F8);fake.Reject=true;check(!manager.TryApply(new Dictionary<string,string>{{"capture",input.Text}},out error)&&error.Contains("原快捷键仍然有效")&&fake.Registered.ContainsKey(id),"recorded conflict lost old key");}});
+        }
+    }
+}

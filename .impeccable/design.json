@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-05T01:34:19.9108971Z",
+  "title": "Design System: ScreenCraft",
+  "extensions": {
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [],
+    "nativePlatform": "Windows WinForms/GDI+; physical screenshot coordinates; 96 DPI baseline",
+    "evidence": [
+      "src/App/CaptureVisuals.cs",
+      "src/App/CaptureOverlay.cs",
+      "docs/evidence/automated/in-place-overlay-synthetic.png",
+      "src/App/PreferencesVisuals.cs",
+      "src/App/SettingsDialog.cs",
+      "src/App/SelectionAppearance.cs",
+      "docs/evidence/automated/settings-0-offscreen.png",
+      "src/App/StyledMenu.cs",
+      "docs/evidence/automated/tray-menu-native-offscreen.png",
+      "docs/evidence/automated/settings-windows-client-offscreen.png",
+      "docs/evidence/automated/capture-buttons-native-states.png",
+      "docs/CAPTURE_BUTTON_PAINT_REPORT.md",
+      "src/App/PreferencesChoice.cs",
+      "src/App/BrandArtwork.cs",
+      "docs/evidence/automated/settings-color-unified-offscreen.png",
+      "docs/evidence/automated/tray-menu-unified-native.png",
+      "src/App/CaptureScene.cs",
+      "src/App/TextStyling.cs",
+      "src/App/AnnotationInspector.cs",
+      "docs/CAPTURE_EDITING_REPORT.md",
+      "docs/evidence/automated/annotation-inspector-offscreen.png",
+      "docs/evidence/automated/note-color-presets-offscreen.png",
+      "src/App/FrozenGlass.cs",
+      "src/App/AnnotationPalette.cs",
+      "docs/POPUP_CAPTURE_FEEDBACK_REPORT.md",
+      "docs/1CAPTURE_CHANGELOG_AUDIT.md",
+      "docs/evidence/automated/feature-gallery.html",
+      "src/App/DailySettings.cs",
+      "src/App/PinManagerWindow.cs",
+      "src/App/BoardWindow.cs",
+      "src/App/BackgroundDialog.cs",
+      "docs/DAILY_WORKFLOW_0.9.0.md",
+      "docs/evidence/automated/daily-gallery.html"
+    ]
+  },
+  "components": [
+    {
+      "name": "Tool button selected",
+      "kind": "button",
+      "refersTo": "tool-button-selected",
+      "description": "Documentation preview of the native selected tool state; runtime uses GDI+.",
+      "html": "<button class=\"ds-tool\" aria-label=\"Arrow\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M4 20L20 4M9 4h11v11\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></button>",
+      "css": ".ds-tool{width:34px;height:34px;border:0;border-radius:8px;background:#DAEAFD;color:#0069EF;display:grid;place-items:center}.ds-tool:hover{background:#E8EDF4}.ds-tool:focus-visible{outline:1px dotted #0069EF;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "原位截图，紧凑标注",
+    "overview": "Shared white operating surfaces for local editing, pin management, opt-in history and independent board. Frozen blur remains on capture bars. Icon rows and contextual annotation modes, Windows native captions, seven settings sections. Non-destructive pin transforms, board geometry, backdrop preview and per-user MSI are validated with synthetic/hidden controls and isolated installation only; desktop GUI NOT RUN.",
+    "keyCharacteristics": [
+      "细线几何图标",
+      "浅色圆角浮条",
+      "蓝色选中态",
+      "选区内原始像素",
+      "工具栏可配置"
+    ],
+    "rules": [
+      {
+        "name": "选区像素与工具控件分离",
+        "body": "Toolbars and the surrounding dim layer are never exported.",
+        "section": "layout"
+      }
+    ],
+    "dos": [
+      "Preserve native keyboard access and labels",
+      "Verify production renderers with synthetic fixtures"
+    ],
+    "donts": [
+      "Do not call synthetic evidence a desktop acceptance pass",
+      "Do not treat legacy file and pin editors as the new visual standard"
+    ]
+  }
+}
