@@ -1,6 +1,6 @@
 # Third-party notices
 
-Project-specific code is available under the repository's Apache License 2.0 (`LICENSE`), except where a file carries another license. Reused Stackshot modules retain their MIT license and original copyright.
+Project-specific code is available under the MIT License (`LICENSE`), except where a file carries another license. Reused Stackshot modules retain their MIT license and original copyright.
 
 ScreenCraft reuses selected C# sources from [rubenitx/stackshot](https://github.com/rubenitx/stackshot) at commit `0fa71af2346f09dc34dd8f48eb4f8df211f5ae7c`.
 

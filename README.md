@@ -1,52 +1,49 @@
 # ScreenCraft
 
-Windows 原生截图、对象标注、多张独立置顶。仓库名为 Screenboard，应用名称为 ScreenCraft。
+一个 Windows 截图、标注和贴图工具。截图后可以直接添加箭头、文字和备注，也可以把图片钉在桌面上，方便对照资料。
 
-项目代码使用 [Apache License 2.0](LICENSE)；复用的 Stackshot 模块保留其 [MIT 许可证](src/Upstream/Stackshot/LICENSE) 和版权。详见 [第三方声明](THIRD_PARTY_NOTICES.md)。
+![ScreenCraft 标注界面](docs/images/annotation-toolbar.png)
 
-**当前为 0.9.4 开发预览。237 项自动化回归通过。** 本版默认自动保存到系统桌面，支持中文及重定向路径；同时包含多选、八点缩放、统一注释与色板、工具栏设置、圆角导出、设置快捷键修复、OCR 语言选择及多层截图吸附。[本版测试说明](docs/RELEASE_0.9.4.md)
+## 主要功能
 
-日常功能：
+- **截图**：框选区域、截取窗口，自动吸附到窗口或控件边界。
+- **标注**：箭头、画笔、文字、编号和云线，支持多选、调整大小和撤销。
+- **贴图**：多张图片独立置顶，可以缩放、旋转、翻转和调整透明度。
+- **辅助工具**：本地文字识别（OCR）、取色、马赛克、水印和滚动长截图。
+- **保存**：导出 PNG，或保存为可继续编辑的工程；自动保存默认使用系统桌面。
 
-- 微信/QQ 式冻结框选与原位标注；显式当前屏全屏、当前窗口、重复区域入口，新增热键默认不占用任何组合键。
-- 二级点/云线/序号模式，文字增长/换行/可调宽度、任意矩形圆角、独立说明、画笔平滑和白边箭头。
-- 多张独立贴图；等比缩放、透明度、方向键、旋转/翻转、隐藏恢复、吸附、边框/阴影和滚轮偏好。
-- 贴图工程保留原图对象与视图方向。Ctrl 拖动贴图准备 PNG 文件拖出；实际跨应用 OLE 尚未验收。
-- 完成动作可选复制、复制并自动保存、仅保存；历史默认关闭，只清理自有副本。
-- 独立多图画板，拖动/等比缩放/90° 旋转/层级/吸附/撤销，保存 scboard 工程及导出完整内容。
-- 背景美化：纯色/12 种渐变、边距、圆角、采样边框、阴影及比例，保留源图与可撤销性。
-- 本地 OCR、RGB/HEX/HSL 取色、垂直长截图、文字备忘、模糊/彩点遮盖、聚光灯和文字水印。
+## 使用
 
-[用户手册](docs/USER_GUIDE.md) · [0.9 实现报告](docs/DAILY_WORKFLOW_0.9.0.md) · [安装教程](docs/INSTALLATION.md) · [更新日志核对](docs/1CAPTURE_CHANGELOG_AUDIT.md)
+支持 Windows 10 / 11（64 位），需要 .NET Framework 4.8。当前版本为开发预览版。
 
-~~~powershell
-.\build.ps1                      # 构建，不运行应用
-.\build.ps1 -Test                # 合成/隐藏 HWND 回归
-.\publish.ps1 -DistributionDirectory dist/0.9.4
-.\tools\verify-package.ps1 -DistributionDirectory dist/0.9.4 -Rebuild
-.\tools\test-installer.ps1       # 仅隔离测试包，静默安装到工作目录
-~~~
+启动后程序会留在系统托盘：
 
-构建应用使用系统 .NET Framework 4.8 编译器；MSI 首次构建下载并核验固定 SHA-256 的 WiX 3.14.1 工具 ZIP，不安装编译器。目标电脑不需要 SDK、WiX、Python 或联网下载依赖。
+- `Ctrl + Alt + A`：开始截图。
+- 截图后直接标注，按 `Enter` 复制，按 `P` 钉到桌面。
+- `Esc`：取消当前操作。
+- 右键托盘图标可以打开设置、OCR、取色和其他工具。
 
-运行发布脚本后，交付生成在 `dist/0.9.4`：独立 EXE、Portable ZIP、每用户 MSI、Source ZIP 和 SHA256SUMS。请先退出旧版托盘再运行新版，单实例机制不会替换旧进程。MSI 默认不运行应用、不启用自启；安装后从开始菜单启动。
+更换版本前，请先退出旧版托盘。更多操作见 [使用说明](docs/USER_GUIDE.md)。
 
-仍不是 1Capture 全功能一比一成品。QR、横向长图、图片水印、任意对象旋转、完整工作流/拖放架、AI 等仍有缺口；录屏/GIF 后置。真实跨应用粘贴、混合 DPI、标准账户登录/自启和安装向导均 NOT RUN。详情见 [已知限制](docs/KNOWN_LIMITATIONS.md) 与 [30 项验收报告](docs/ACCEPTANCE_REPORT.md)。
+## 从源码运行
 
+在 Windows PowerShell 中执行：
 
-## 从源码开始
-
-~~~powershell
-git clone https://github.com/Louissagan/Screenboard.git
-cd Screenboard
+```powershell
+git clone https://github.com/Louissagan/ScreenCraft.git
+cd ScreenCraft
 .\build.ps1
 .\bin\Release\ScreenCraft.exe
-~~~
+```
 
-需要 Windows 10/11 x64 与 .NET Framework 4.8。代码、测试与构建脚本均在仓库内；无需 NuGet 包。MSI 打包首次需要下载并校验 WiX 工具，详见构建命令与第三方声明。
+构建使用系统自带的 .NET Framework 编译器。测试和打包命令见 [开发说明](docs/DEVELOPMENT.md)。
 
-本机配置、截图历史、编译产物和旧运行日志不入库。运行 `build.ps1 -Test` 可重新生成合成测试证据；历史报告中 `docs/evidence/` 链接指本地生成记录，不是随仓库发布的用户截图。当前公开副本已完成 237 项自动回归。
+## 反馈
 
-![合成标注示例](docs/images/annotation-toolbar.png)
+欢迎在 [Issues](https://github.com/Louissagan/ScreenCraft/issues) 中提交问题或建议。遇到截图、缩放或显示异常时，请附上复现步骤、Windows 版本和显示器缩放比例。
 
-![内置调色板](docs/images/color-picker.png)
+当前仍有一些功能限制，见 [已知问题](docs/KNOWN_LIMITATIONS.md)。
+
+## 许可证
+
+本项目采用 [MIT 许可证](LICENSE)。项目基于 [Stackshot](https://github.com/rubenitx/stackshot) 的部分代码开发，保留了原作者的版权和 MIT 许可声明。其他第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
