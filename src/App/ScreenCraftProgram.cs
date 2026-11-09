@@ -78,7 +78,7 @@ namespace ScreenCraft {
     else {
      Action<Bitmap,Rectangle,Rectangle,IWin32Window> edit=delegate(Bitmap frozen,Rectangle bounds,Rectangle rect,IWin32Window owner){
       using(var editor=new CaptureOverlay(frozen,bounds,rect,Array.ConvertAll(Screen.AllScreens,delegate(Screen screen){return screen.WorkingArea;}),preferences.Toolbar,preferences.SelectionDimPercent,preferences)){
-       editor.ShowDialog(owner);
+       editor.ShowForCapture(owner);
        if(editor.Completed){var r=editor.ScreenSelection;preferences.LastCapture=new[]{r.X,r.Y,r.Width,r.Height};try{preferencesStore.Save(preferences);}catch(Exception ex){host.Notify("上次截图范围未保存",ex.Message);}}
        var boardImage=editor.TakeBoardImage();var textImage=editor.TakeOcrImage();if(boardImage!=null)afterCapture=delegate{var board=new BoardWindow();board.Document.AddImage(boardImage,PointF.Empty);board.Show();};else if(textImage!=null)afterCapture=delegate{using(textImage)host.CopyText(textImage,null);};else if(editor.ScrollRequested)afterCapture=BeginScroll;
       }

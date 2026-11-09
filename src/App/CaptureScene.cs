@@ -27,6 +27,7 @@ namespace ScreenCraft
         internal int CaptureDim=SelectionAppearance.DefaultDimPercent;
         CaptureScene captureScene;
         internal int SceneBuildCount;
+        internal void PrepareCaptureSurface(){SetStyle(System.Windows.Forms.ControlStyles.Opaque,true);}
         internal Func<System.Windows.Forms.MouseEventArgs,bool> CaptureDown,CaptureMove,CaptureUp;
         internal Action<Graphics> PaintCaptureChrome;
         bool PaintFrozenSurface(System.Windows.Forms.PaintEventArgs e)

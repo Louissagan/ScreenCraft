@@ -40,7 +40,7 @@ namespace ScreenCraft
             guidesEnabled=appearance.ShowCaptureGuides;
             workAreas=screenWorkAreas==null?new[]{new Rectangle(Point.Empty,desktop.Size)}:Array.ConvertAll(screenWorkAreas,delegate(Rectangle r){r.Offset(-desktop.Left,-desktop.Top);return Rectangle.Intersect(r,new Rectangle(Point.Empty,desktop.Size));});
             Text="ScreenCraft · 原位截图标注";AutoScaleMode=AutoScaleMode.None;Font=new Font("Microsoft YaHei UI",9);FormBorderStyle=FormBorderStyle.None;StartPosition=FormStartPosition.Manual;Bounds=desktop;TopMost=true;ShowInTaskbar=false;KeyPreview=true;DoubleBuffered=true;
-            canvas=new Canvas(ownedFrozen){InPlaceViewport=true,FullCaptureSurface=true,CaptureDim=dimPercent,Bg=new Settings(),Bounds=ClientRectangle,Ui=1};canvas.SetCaptureSelection(selection,false);canvas.SetColor(AnnotationColors.Default);canvas.DefaultStyle.FillColor=Color.FromArgb(60,canvas.Color);
+            canvas=new Canvas(ownedFrozen){InPlaceViewport=true,FullCaptureSurface=true,CaptureDim=dimPercent,Bg=new Settings(),Bounds=ClientRectangle,Ui=1};canvas.PrepareCaptureSurface();canvas.SetCaptureSelection(selection,false);canvas.SetColor(AnnotationColors.Default);canvas.DefaultStyle.FillColor=Color.FromArgb(60,canvas.Color);
             inspectorPanel.Visible=false;options.Controls.Add(propertyTitle);
             Controls.Add(canvas);canvas.Controls.Add(bar);canvas.Controls.Add(optionsBar);canvas.Controls.Add(inspectorPanel);bar.Controls.Add(tools);optionsBar.Controls.Add(options);canvas.PaintCaptureChrome=PaintRangeChrome;canvas.CaptureDown=RangeDown;canvas.CaptureMove=RangeMove;canvas.CaptureUp=RangeUp;
             BuildConfigurableTools();
@@ -75,7 +75,7 @@ namespace ScreenCraft
             RememberStripSizes(tools);
             RememberStripSizes(options);
             Tool initial;if(Enum.TryParse<Tool>(appearance.InitialTool,out initial)&&Enum.IsDefined(typeof(Tool),initial))canvas.SetTool(initial);
-            canvas.StateChanged+=delegate{RefreshState();};Shown+=delegate{canvas.Focus();};RefreshState();
+            canvas.StateChanged+=delegate{RefreshState();if(!Visible)PrepareFirstFrame();};Shown+=delegate{canvas.Focus();};RefreshState();PrepareFirstFrame();
             canvas.MouseWheel+=delegate(object sender,MouseEventArgs e){if(!canvas.Typing&&!canvas.Busy&&e.Delta!=0)stroke.Value+=Math.Sign(e.Delta);};
         }
         static FlowLayoutPanel Flow(){return new CaptureFlow{FlowDirection=FlowDirection.LeftToRight,WrapContents=true,BackColor=Color.Transparent,Margin=Padding.Empty,Padding=Padding.Empty};}
@@ -195,8 +195,9 @@ namespace ScreenCraft
         protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(rangeHandle!=-1)UpdateRangeDrag(e.Location);}
         protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);if(e.Button==MouseButtons.Left&&rangeHandle!=-1){UpdateRangeDrag(e.Location);EndRangeDrag();Capture=false;canvas.Focus();}}
         protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture&&rangeHandle!=-1)CancelRangeDrag();}
-        protected override void OnPaint(PaintEventArgs e){canvas.PaintCaptureBackdrop(e.Graphics);base.OnPaint(e);}
-        protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);Native.SetWindowDisplayAffinity(Handle,0x11);}
+        protected override void OnPaint(PaintEventArgs e){if(firstFrame!=null)firstFrame.Paint(e.Graphics,e.ClipRectangle);else canvas.PaintCaptureBackdrop(e.Graphics);base.OnPaint(e);}
+        protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);CaptureDisplay.Prepare(Handle);CaptureDisplay.ExcludeFromCapture(Handle);}
+        protected override void OnPaintBackground(PaintEventArgs e){}
         protected override bool ProcessCmdKey(ref Message msg,Keys keys)
         {
             if(rangeHandle!=-1){
@@ -213,6 +214,6 @@ namespace ScreenCraft
             string command=toolbarSettings.FindAction(keys);if(command!=null){ExecuteCommand(delegate{SelectToolbarTool(command);});return true;}
             Keys key=keys&Keys.KeyCode;if(key==Keys.Left||key==Keys.Right||key==Keys.Up||key==Keys.Down){int step=(keys&Keys.Shift)!=0?10:1;int dx=key==Keys.Left?-step:key==Keys.Right?step:0,dy=key==Keys.Up?-step:key==Keys.Down?step:0;if(canvas.HasSelection)canvas.Nudge(dx,dy);else{var adjusted=CaptureKeyboard.AdjustRange(Rectangle.Round(canvas.Crop),keys,ClientRectangle);canvas.SetCaptureSelection(adjusted,true);SetGuide(new Point(adjusted.Right,adjusted.Bottom),true);}return true;}return base.ProcessCmdKey(ref msg,keys);
         }
-        protected override void Dispose(bool disposing){if(disposing){DisposePopups();if(pendingBoard!=null){pendingBoard.Dispose();pendingBoard=null;}tips.Dispose();if(pendingOcr!=null){pendingOcr.Dispose();pendingOcr=null;}}base.Dispose(disposing);}
+        protected override void Dispose(bool disposing){if(disposing){DropFirstFrame();DisposePopups();if(pendingBoard!=null){pendingBoard.Dispose();pendingBoard=null;}tips.Dispose();if(pendingOcr!=null){pendingOcr.Dispose();pendingOcr=null;}}base.Dispose(disposing);}
     }
 }

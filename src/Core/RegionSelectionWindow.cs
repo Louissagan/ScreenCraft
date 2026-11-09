@@ -32,7 +32,10 @@ namespace ScreenCraft
         Rectangle resizeOriginal;
         float monitorScale=1;
         Font labelFont;
+        PreparedCaptureFrame prepared;
+        internal int PreparedRevision{get{return prepared==null?0:prepared.Revision;}}
         Mode chosen;
+        bool annotationSelected,retiredForAnnotation;
         RegionPicker(Dib pixels,Rectangle bounds,List<Grabber.Win> windows,Mode purpose):this(pixels,bounds,windows,purpose,false,false){}
         internal RegionPicker(Dib pixels,Rectangle bounds,List<Grabber.Win> windows,Mode purpose,bool allInOne,bool adjustFirst)
         {
@@ -41,9 +44,11 @@ namespace ScreenCraft
             frozen=bright.ToBitmap();var preferences=CaptureHost.Running==null?null:CaptureHost.Running.ColorPreferences;
             scene=new CaptureScene(frozen,preferences==null?SelectionAppearance.DefaultDimPercent:preferences.SelectionDimPercent);
             if(preferences!=null){colorFormat=preferences.ColorFormat;colorUpper=preferences.ColorUpper;}
-            labelFont=new Font("Microsoft YaHei UI",12,GraphicsUnit.Pixel);Text="ScreenCraft · 选择截图范围";FormBorderStyle=FormBorderStyle.None;StartPosition=FormStartPosition.Manual;ShowInTaskbar=false;TopMost=true;KeyPreview=true;Bounds=bounds;Cursor=Cursors.Cross;
-            SetStyle(ControlStyles.AllPaintingInWmPaint|ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);
+            labelFont=new Font("Microsoft YaHei UI",12,GraphicsUnit.Pixel);Text="ScreenCraft · 选择截图范围";AutoScaleMode=AutoScaleMode.None;FormBorderStyle=FormBorderStyle.None;StartPosition=FormStartPosition.Manual;ShowInTaskbar=false;TopMost=true;KeyPreview=true;Bounds=bounds;Cursor=Cursors.Cross;
+            SetStyle(ControlStyles.Opaque|ControlStyles.AllPaintingInWmPaint|ControlStyles.UserPaint|ControlStyles.ResizeRedraw,true);
+            SetStyle(ControlStyles.OptimizedDoubleBuffer,false);
             var mouse=MousePosition;cur=new Point(mouse.X-bounds.X,mouse.Y-bounds.Y);TrackMonitor();UpdateHover();
+            prepared=new PreparedCaptureFrame(bounds.Size);prepared.Compose(PaintFrame);
             }catch{ReleasePixels();throw;}
         }
         public static Rectangle Pick(Mode purpose,out Bitmap image,out Rectangle imageBounds,out IntPtr window){Mode chosen;return Pick(purpose,false,false,out image,out imageBounds,out window,out chosen);}
@@ -56,7 +61,10 @@ namespace ScreenCraft
             }
         }
         protected override CreateParams CreateParams{get{var parameters=base.CreateParams;parameters.ExStyle|=0x88;return parameters;}}
-        protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);Native.SetWindowDisplayAffinity(Handle,0x11);}
+        protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);CaptureDisplay.Prepare(Handle);CaptureDisplay.ExcludeFromCapture(Handle);}
+        protected override void OnShown(EventArgs e){if(prepared!=null)prepared.Present(Handle);base.OnShown(e);}
+        protected override void OnVisibleChanged(EventArgs e){base.OnVisibleChanged(e);if(Visible&&prepared!=null)prepared.Present(Handle);}
+        internal void RetireForAnnotation(){if(!annotationSelected||retiredForAnnotation)return;retiredForAnnotation=true;Hide();DisposeSmartRegions();ReleasePixels();}
         Rectangle Area{get{return new Rectangle(0,0,vs.Width,vs.Height);}}
         int Pz(float value){return Math.Max(1,(int)Math.Round(value*monitorScale));}
         void TrackMonitor()
@@ -69,18 +77,22 @@ namespace ScreenCraft
             if(down||adjusting||loupe||measuring)return;Point physical=new Point(cur.X+vs.X,cur.Y+vs.Y);hover=curMon;hoverHandle=IntPtr.Zero;
             foreach(var window in wins)if(window.Bounds.Contains(physical)){var region=SmartHover(window.Bounds,window.Handle,physical);hover=Rectangle.Intersect(region,vs);hover.Offset(-vs.X,-vs.Y);hoverHandle=region==window.Bounds?window.Handle:IntPtr.Zero;break;}
         }
-        void Present(){if(!IsDisposed)Invalidate();}
+        void Present(){if(IsDisposed||resourcesReleased||prepared==null)return;prepared.Compose(PaintFrame);if(IsHandleCreated&&Visible)prepared.Present(Handle);else Invalidate();}
         protected override void OnPaintBackground(PaintEventArgs e){}
         protected override void OnPaint(PaintEventArgs e)
         {
-            if(resourcesReleased)return;Rectangle selected=down&&dragging||adjusting?sel:loupe||measuring||measured?Rectangle.Empty:hover;scene.Paint(e.Graphics,selected);
-            if(GuidesVisible)SelectionAppearance.PaintCrosshair(e.Graphics,cur,Area,CaptureLook.Blue);
-            if(!selected.IsEmpty){SelectionAppearance.PaintFrame(e.Graphics,selected);if(adjusting)foreach(var point in CaptureOverlayGeometry.Handles(selected))SelectionAppearance.PaintHandle(e.Graphics,new Rectangle(point.X-Pz(3),point.Y-Pz(3),Pz(6),Pz(6)));
-                var label=new Rectangle(selected.Left,Math.Max(curMon.Top,selected.Top-Pz(28)),Pz(128),Pz(24));PreferencesLook.Round(e.Graphics,label,Color.FromArgb(225,32,38,49),Pz(4),null);PreferencesLook.Text(e.Graphics,selected.Width+" × "+selected.Height,labelFont,label,Color.White,StringAlignment.Center);
+            if(!resourcesReleased&&prepared!=null)prepared.Paint(e.Graphics,e.ClipRectangle);
+        }
+        void PaintFrame(Graphics graphics)
+        {
+            Rectangle selected=annotationSelected||down&&dragging||adjusting?sel:loupe||measuring||measured?Rectangle.Empty:hover;scene.Paint(graphics,selected);
+            if(!annotationSelected&&GuidesVisible)SelectionAppearance.PaintCrosshair(graphics,cur,Area,CaptureLook.Blue);
+            if(!selected.IsEmpty){SelectionAppearance.PaintFrame(graphics,selected);if(adjusting)foreach(var point in CaptureOverlayGeometry.Handles(selected))SelectionAppearance.PaintHandle(graphics,new Rectangle(point.X-Pz(3),point.Y-Pz(3),Pz(6),Pz(6)));
+                var label=new Rectangle(selected.Left,Math.Max(curMon.Top,selected.Top-Pz(28)),Pz(128),Pz(24));PreferencesLook.Round(graphics,label,Color.FromArgb(225,32,38,49),Pz(4),null);PreferencesLook.Text(graphics,selected.Width+" × "+selected.Height,labelFont,label,Color.White,StringAlignment.Center);
             }
-            if(adjusting){barRect=new Rectangle(Math.Max(curMon.Left,Math.Min(curMon.Right-Pz(270),sel.Right-Pz(270))),Math.Max(curMon.Top,Math.Min(curMon.Bottom-Pz(36),sel.Bottom+Pz(8))),Pz(270),Pz(32));PreferencesLook.FloatingCard(e.Graphics,barRect,Pz(6));PreferencesLook.Text(e.Graphics,"Enter 完成  ·  Esc 取消",labelFont,barRect,PreferencesLook.Ink,StringAlignment.Center);}
-            if(loupe)PaintLoupe(e.Graphics);
-            if(measuring||measured){using(var pen=new Pen(CaptureLook.Blue,Pz(2)))e.Graphics.DrawLine(pen,measureStart,measureEnd);double length=Math.Sqrt(Math.Pow(measureEnd.X-measureStart.X,2)+Math.Pow(measureEnd.Y-measureStart.Y,2));var label=new Rectangle(measureEnd.X+Pz(12),measureEnd.Y+Pz(12),Pz(180),Pz(28));PreferencesLook.Round(e.Graphics,label,Color.White,Pz(4),null);PreferencesLook.Text(e.Graphics,length.ToString("0.0")+" px",labelFont,label,PreferencesLook.Ink,StringAlignment.Center);}
+            if(adjusting){barRect=new Rectangle(Math.Max(curMon.Left,Math.Min(curMon.Right-Pz(270),sel.Right-Pz(270))),Math.Max(curMon.Top,Math.Min(curMon.Bottom-Pz(36),sel.Bottom+Pz(8))),Pz(270),Pz(32));PreferencesLook.FloatingCard(graphics,barRect,Pz(6));PreferencesLook.Text(graphics,"Enter 完成  ·  Esc 取消",labelFont,barRect,PreferencesLook.Ink,StringAlignment.Center);}
+            if(loupe)PaintLoupe(graphics);
+            if(measuring||measured){using(var pen=new Pen(CaptureLook.Blue,Pz(2)))graphics.DrawLine(pen,measureStart,measureEnd);double length=Math.Sqrt(Math.Pow(measureEnd.X-measureStart.X,2)+Math.Pow(measureEnd.Y-measureStart.Y,2));var label=new Rectangle(measureEnd.X+Pz(12),measureEnd.Y+Pz(12),Pz(180),Pz(28));PreferencesLook.Round(graphics,label,Color.White,Pz(4),null);PreferencesLook.Text(graphics,length.ToString("0.0")+" px",labelFont,label,PreferencesLook.Ink,StringAlignment.Center);}
         }
         void PaintLoupe(Graphics g)
         {
@@ -134,12 +146,12 @@ namespace ScreenCraft
         void Accept(Rectangle selected,IntPtr window)
         {
             var local=Rectangle.Intersect(selected,Area);if(local.Width<1||local.Height<1){Cancel();return;}ClearSmartHover();result=local;result.Offset(vs.X,vs.Y);resultWindow=window;
-            if(annotationHandoff){var image=bright.ToBitmap();if(annotationEditor==null)annotationDesktop=image;else try{annotationEditor(image,vs,result,this);}catch(Exception ex){image.Dispose();annotationError=ex;}}
+            if(annotationHandoff){sel=local;annotationSelected=true;Present();var image=bright.ToBitmap();if(annotationEditor==null)annotationDesktop=image;else try{annotationEditor(image,vs,result,this);}catch(Exception ex){image.Dispose();annotationError=ex;}}
             else if(chosen==Mode.Image||chosen==Mode.Text){crop=frozen.Clone(local,PixelFormat.Format32bppArgb);cropAt=result;}
             if(Accepted!=null)Accepted();DialogResult=DialogResult.OK;Close();
         }
         void Cancel(){result=Rectangle.Empty;DialogResult=DialogResult.Cancel;Close();}
-        void ReleasePixels(){if(resourcesReleased)return;resourcesReleased=true;if(scene!=null)scene.Dispose();if(frozen!=null)frozen.Dispose();if(bright!=null)bright.Dispose();if(labelFont!=null)labelFont.Dispose();if(crop!=null){crop.Dispose();crop=null;}if(annotationDesktop!=null){annotationDesktop.Dispose();annotationDesktop=null;}}
+        void ReleasePixels(){if(resourcesReleased)return;resourcesReleased=true;if(prepared!=null){prepared.Dispose();prepared=null;}if(scene!=null)scene.Dispose();if(frozen!=null)frozen.Dispose();if(bright!=null)bright.Dispose();if(labelFont!=null)labelFont.Dispose();if(crop!=null){crop.Dispose();crop=null;}if(annotationDesktop!=null){annotationDesktop.Dispose();annotationDesktop=null;}}
         protected override void OnFormClosed(FormClosedEventArgs e){DisposeSmartRegions();base.OnFormClosed(e);}
     }
 }
