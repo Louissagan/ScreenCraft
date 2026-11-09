@@ -1,4 +1,4 @@
-# 开发说明
+﻿# 开发说明
 
 需要 Windows 10/11 x64 和 .NET Framework 4.8。应用没有 NuGet 依赖，也不需要安装 .NET SDK。
 
@@ -14,8 +14,8 @@
 ## 打包
 
 ```powershell
-.\publish.ps1 -DistributionDirectory dist/0.9.4
-.\tools\verify-package.ps1 -DistributionDirectory dist/0.9.4 -Rebuild
+.\publish.ps1 -DistributionDirectory dist/0.10.0
+.\tools\verify-package.ps1 -DistributionDirectory dist/0.10.0 -Rebuild
 ```
 
 发布脚本生成便携 ZIP、每用户 MSI、源码 ZIP 和 SHA-256 校验文件。首次构建 MSI 时会下载并校验 WiX 3.14.1；运行应用不需要 WiX。
@@ -25,8 +25,9 @@
 ## 代码目录
 
 - `src/App`：ScreenCraft 功能与界面。
-- `src/Upstream/Stackshot`：复用的上游模块及原始许可证。
+- `src/Core`：重写后的采集、画布、渲染、贴图、拼接与 OCR 调用。
+- `src/Upstream/Stackshot/LICENSE`：早期版本原始许可，仅作历史保留。
 - `tests`：自动化测试。
 - `tools`：打包、检查与界面测试工具。
 
-源文件沿用各自的版权声明。更新上游模块后可运行 `tools/update-provenance.ps1` 更新来源记录。
+构建输出与二进制绑定的 `.sources.json` 输入清单。运行 `tools/audit-core.ps1` 检查二进制和源文件哈希、编译目录及旧命名空间；历史来源清单不再覆盖更新。重写记录见 `CORE_REWRITE.md`。

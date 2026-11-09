@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed partial class CaptureOverlay
     {
@@ -23,7 +23,7 @@ namespace Stackshot
         void ConfigureToolbar()
         {
             using(var dialog=new ToolbarSettingsDialog(toolbarSettings))if(dialog.ShowDialog(this)==DialogResult.OK){
-                if(ShotStack.Running!=null&&ShotStack.Running.ToolbarChanged!=null)ShotStack.Running.ToolbarChanged(dialog.Result.Clone());
+                if(CaptureHost.Running!=null&&CaptureHost.Running.ToolbarChanged!=null)CaptureHost.Running.ToolbarChanged(dialog.Result.Clone());
                 ApplyToolbarConfiguration(dialog.Result);
             }
         }

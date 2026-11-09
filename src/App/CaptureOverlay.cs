@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed partial class CaptureOverlay:Form
     {
@@ -26,7 +26,7 @@ namespace Stackshot
         readonly CaptureSlider labelWidth=new CaptureSlider{Minimum=60,Maximum=800,Value=320,Width=105};readonly Label widthValue=new CaptureLabel{Width=78,Height=34,BackColor=Color.Transparent,TextAlign=ContentAlignment.MiddleCenter};readonly Panel noteDivider=new Panel{Width=1,Height=23,BackColor=CaptureLook.Line,Margin=new Padding(4,6,4,3)};
         int rangeHandle=-1;Point dragStart;Rectangle originalRange;
         Bitmap pendingOcr;public bool ScrollRequested{get;private set;}
-        internal Action<Bitmap> CopyOutput=ShotStack.CopyImage;
+        internal Action<Bitmap> CopyOutput=CaptureHost.CopyImage;
         internal Action<string> CopyColorText=Clipboard.SetText;
         internal Action<string> CommandError;
         internal Action<AnnotationDocument> PinOutput=delegate(AnnotationDocument doc){PinWindow.Open(doc);};
@@ -129,7 +129,7 @@ namespace Stackshot
         bool RangeMove(MouseEventArgs e){if(rangeHandle!=-1){UpdateRangeDrag(e.Location);return true;}if(canvas.Busy){SetGuide(e.Location,false);return false;}for(int i=0;i<handles.Length;i++)if(Rectangle.Inflate(handles[i],3,3).Contains(e.Location)){SetGuide(e.Location,true);canvas.Cursor=CursorFor(i);return true;}if(dimensions.Bounds.Contains(e.Location)){SetGuide(e.Location,true);canvas.Cursor=Cursors.SizeAll;return true;}SetGuide(e.Location,canvas.Tool==Tool.Crop);return false;}
         bool RangeUp(MouseEventArgs e){if(rangeHandle==-1)return false;if(e.Button==MouseButtons.Left){UpdateRangeDrag(e.Location);EndRangeDrag();canvas.Capture=false;}return true;}
         void ApplyAnnotationColor(Color color){canvas.SetColor(color);}
-        internal void ApplySampledColor(Color color){ApplyAnnotationColor(color);var host=ShotStack.Running;var preferences=host==null?null:host.ColorPreferences;string value=ColorValues.Format(color,preferences==null?"RGB":preferences.ColorFormat,preferences==null||preferences.ColorUpper);try{CopyColorText(value);tips.SetToolTip(swatch,"已复制颜色 "+value);}catch(System.Runtime.InteropServices.ExternalException){tips.SetToolTip(swatch,"颜色 "+value+"；剪贴板忙，请重新取色复制。");}}
+        internal void ApplySampledColor(Color color){ApplyAnnotationColor(color);var host=CaptureHost.Running;var preferences=host==null?null:host.ColorPreferences;string value=ColorValues.Format(color,preferences==null?"RGB":preferences.ColorFormat,preferences==null||preferences.ColorUpper);try{CopyColorText(value);tips.SetToolTip(swatch,"已复制颜色 "+value);}catch(System.Runtime.InteropServices.ExternalException){tips.SetToolTip(swatch,"颜色 "+value+"；剪贴板忙，请重新取色复制。");}}
         void ShowMore(Control anchor){PrepareMoreMenu().Show(anchor,new Point(0,anchor.Height));}
         void Copy(){canvas.CommitText();using(var image=canvas.Render())CaptureCompletion.Deliver(image,completionPreferences,OutputRoot,CopyOutput);Completed=true;Close();}
         void Pin(){canvas.CommitText();var doc=canvas.ExportDocument();try{if(completionPreferences.HistoryEnabled)using(var image=doc.Render())new CaptureHistory(OutputRoot).Record(image,completionPreferences.HistoryLimit);PinOutput(doc);}catch{doc.Dispose();throw;}Completed=true;Close();}

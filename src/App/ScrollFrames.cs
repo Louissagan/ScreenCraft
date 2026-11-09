@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-namespace Stackshot
+namespace ScreenCraft
 {
     public interface IScrollFrameSource:IDisposable {void Read(int[] destination);}
     // Allocated only by an explicit user capture. Tests supply synthetic frames through the same interface.

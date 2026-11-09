@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 using System.Drawing;
-namespace Stackshot
+namespace ScreenCraft
 {
     public partial class Canvas
     {

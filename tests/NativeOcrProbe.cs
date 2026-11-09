@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Text;
 using System.IO;
 using System.Threading;
 using System.Web.Script.Serialization;
-namespace Stackshot
+namespace ScreenCraft
 {
     static class NativeOcrProbe
     {
@@ -52,11 +52,17 @@ namespace Stackshot
                 sparse.Save(Path.Combine(output,"ocr-known-limitation-input.png"));var read=service.RecognizeAsync(sparse,"en",CancellationToken.None,TimeSpan.FromSeconds(10),null).GetAwaiter().GetResult();
                 bool recognized=read.Success&&(read.Text??"").Contains("11111");records.Add(new{Case="isolated First line 11111 engine accuracy regression",Status=recognized?"PASS":"KNOWN LIMITATION",Expected="First line 11111",ActualFromSyntheticFixture=read.Text,Error=read.Error,Issue="OCR-001: English Windows engine misses this short line; no accuracy guarantee, no cloud fallback"});Console.WriteLine((recognized?"PASS":"KNOWN LIMITATION")+" OCR-001 isolated short line: "+read.Text);
             }
+            if(caps.Available&&Ocr.SelectLanguage("en",caps.Languages)!=null)
+            using(var sideways=new Bitmap(1100,260)){
+                using(var graphics=Graphics.FromImage(sideways))using(var font=new Font("Microsoft YaHei UI",34,GraphicsUnit.Pixel)){graphics.Clear(Color.White);graphics.DrawString("ScreenCraft rotated OCR 67890",font,Brushes.Black,24,24);}
+                sideways.RotateFlip(RotateFlipType.Rotate90FlipNone);var read=service.RecognizeAsync(sideways,"en",CancellationToken.None,TimeSpan.FromSeconds(25),null).GetAwaiter().GetResult();
+                bool okay=read.Success&&(read.Text??"").Contains("67890")&&(read.Text??"").IndexOf("ScreenCraft",StringComparison.OrdinalIgnoreCase)>=0;records.Add(new{Case="sideways local OCR synthetic text",Status=okay?"PASS":"FAIL",Actual=read.Text,Error=read.Error});Console.WriteLine((okay?"PASS":"FAIL")+" rotated Windows OCR: "+read.Text);
+            }
             using(var blank=new Bitmap(10,10)){
                 var missing=service.RecognizeAsync(blank,"zz-MISSING",CancellationToken.None,TimeSpan.FromSeconds(5),null).GetAwaiter().GetResult();
                 bool okay=!missing.Success&&missing.Error!=null&&(missing.Error.Contains("zz-MISSING")||!caps.Available);records.Add(new{Case="explicit missing language never falls back to cloud or another script",Status=okay?"PASS":"FAIL",Error=missing.Error});Console.WriteLine((okay?"PASS":"FAIL")+" missing-language handling");
             }
-            string json=new JavaScriptSerializer().Serialize(new{Date="2026-11-04",Mode="Local Windows OCR on synthetic image only; no desktop, clipboard, network or language installation",Cases=records});
+            string json=new JavaScriptSerializer().Serialize(new{Date="2026-11-09",Mode="Local Windows OCR on synthetic image only; no desktop, clipboard, network or language installation",Cases=records});
             File.WriteAllText(Path.Combine(output,"native-ocr-probe.json"),json);Console.WriteLine("OCR probe saved; installed languages: "+string.Join(", ",caps.Languages));return json.Contains("\"Status\":\"FAIL\"")?1:0;
         }
     }

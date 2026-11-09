@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -6,7 +6,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Compression;
 using System.Web.Script.Serialization;
-namespace Stackshot
+namespace ScreenCraft
 {
     // Explicit editable files retain the original image. PNG export contains only flattened pixels.
     public sealed class AnnotationDocument : IDisposable

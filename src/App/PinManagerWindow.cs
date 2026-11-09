@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal sealed class PinManagerWindow:Form
     {
@@ -10,7 +10,7 @@ namespace Stackshot
         internal Action<PinWindow> RestorePin=delegate(PinWindow pin){pin.RestoreInteraction();};
         internal PinManagerWindow()
         {
-            Text="ScreenCraft · 贴图管理";Icon=ShotStack.AppIcon;Font=new Font("Microsoft YaHei UI",9);ClientSize=new Size(840,580);MinimumSize=new Size(700,480);BackColor=PreferencesLook.Background;StartPosition=FormStartPosition.CenterParent;
+            Text="ScreenCraft · 贴图管理";Icon=CaptureHost.AppIcon;Font=new Font("Microsoft YaHei UI",9);ClientSize=new Size(840,580);MinimumSize=new Size(700,480);BackColor=PreferencesLook.Background;StartPosition=FormStartPosition.CenterParent;
             list.DrawItem+=delegate(object sender,DrawItemEventArgs e){if(e.Index<0||e.Index>=list.Items.Count)return;var pin=(PinWindow)list.Items[e.Index];using(var fill=new SolidBrush((e.State&DrawItemState.Selected)!=0?CaptureLook.Selected:Color.White))e.Graphics.FillRectangle(fill,e.Bounds);PreferencesLook.Text(e.Graphics,"贴图 "+pin.PinId.Substring(0,6),Font,new Rectangle(12,e.Bounds.Top+4,list.Width-24,25),PreferencesLook.Ink,StringAlignment.Near);PreferencesLook.Text(e.Graphics,(pin.State.HiddenByUser?"已隐藏 · ":pin.State.ClickThrough?"鼠标穿透 · ":"")+(int)Math.Round(pin.State.Zoom*100)+"% · 透明度 "+pin.State.OpacityPercent+"%",Font,new Rectangle(12,e.Bounds.Top+29,list.Width-24,24),PreferencesLook.Muted,StringAlignment.Near);};
             list.SelectedIndexChanged+=delegate{var old=preview.Image;preview.Image=null;if(old!=null)old.Dispose();var selected=list.SelectedItem as PinWindow;if(selected!=null&&!selected.IsDisposed)preview.Image=selected.PreviewImage(new Size(600,440));};
             Add("stack","恢复与定位",delegate(PinWindow pin){RestorePin(pin);});Add("hide","隐藏此图",delegate(PinWindow pin){pin.SetPinHidden(true);});Add("edit","重新编辑",delegate(PinWindow pin){pin.EditImage();});Add("rotate","旋转 90°",delegate(PinWindow pin){pin.ChangeView(1,false,false);});Add("flip","水平翻转",delegate(PinWindow pin){pin.ChangeView(0,true,false);});Add("cancel","关闭此图",delegate(PinWindow pin){pin.Close();});

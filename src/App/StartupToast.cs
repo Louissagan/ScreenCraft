@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Text;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal sealed class StartupToast:Form
     {
@@ -20,13 +20,13 @@ namespace Stackshot
             return new Rectangle(Math.Max(workArea.Left,workArea.Right-width-margin),Math.Max(workArea.Top,workArea.Bottom-height-margin),width,height);
         }
         internal StartupToast(Rectangle workArea,string captureKey,bool alreadyRunning=false)
-            :this(workArea,captureKey,alreadyRunning,ShotStack.ScaleFor(Screen.FromRectangle(workArea))){}
+            :this(workArea,captureKey,alreadyRunning,CaptureHost.ScaleFor(Screen.FromRectangle(workArea))){}
         internal StartupToast(Rectangle workArea,string captureKey,bool alreadyRunning,float displayScale)
         {
             scale=Math.Max(1,Math.Min(4,displayScale));
             title=alreadyRunning?"ScreenCraft 已在运行":"ScreenCraft 已启动";
             detail=string.IsNullOrEmpty(captureKey)?"左键托盘图标截图，右键打开设置。":"按 "+captureKey+" 截图 · 右键托盘打开设置";
-            Text=title;Icon=ShotStack.AppIcon;AccessibleName=title;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;StartPosition=FormStartPosition.Manual;TopMost=true;AutoScaleMode=AutoScaleMode.None;
+            Text=title;Icon=CaptureHost.AppIcon;AccessibleName=title;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;StartPosition=FormStartPosition.Manual;TopMost=true;AutoScaleMode=AutoScaleMode.None;
             // Use physical pixels consistently for fonts, icon and layout at fractional DPI.
             Font=new Font("Microsoft YaHei UI",13*scale,FontStyle.Regular,GraphicsUnit.Pixel);
             heading=new Font(Font.FontFamily,14*scale,FontStyle.Bold,GraphicsUnit.Pixel);

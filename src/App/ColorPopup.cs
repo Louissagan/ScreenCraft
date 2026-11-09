@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     // Reuse each native popup until its anchor is disposed; never dispose it inside a Closed event.
     internal sealed class ColorPopup:IDisposable
@@ -13,7 +13,7 @@ namespace Stackshot
         void OwnerDisposed(object sender,EventArgs e){Dispose();}
         internal StyledMenu Prepare(Color current,Action<Color> selected,Action pick=null)
         {
-            choose=selected;sample=pick;float next=ShotStack.ScaleFor(Screen.FromControl(anchor));
+            choose=selected;sample=pick;float next=CaptureHost.ScaleFor(Screen.FromControl(anchor));
             if(Menu==null||Math.Abs(next-scale)>.01f){if(Menu!=null)Menu.Dispose();scale=next;
                 Menu=new StyledMenu{MinimumContentWidth=0,ShowImageMargin=false};
                 Palette=new AnnotationPalette(current,delegate(Color color){if(choose!=null)choose(color);Menu.Close();},null,scale);

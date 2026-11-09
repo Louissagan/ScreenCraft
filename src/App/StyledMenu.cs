@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal sealed class CraftMenuItem:ToolStripMenuItem
     {

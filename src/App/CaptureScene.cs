@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-namespace Stackshot
+namespace ScreenCraft
 {
     // Immutable frozen pixels and a single cached dim layer. Moving the crop never moves this surface HWND.
     internal sealed class CaptureScene:IDisposable

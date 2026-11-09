@@ -1,11 +1,11 @@
-// Opt-in native focus/WM_HOTKEY regression; only self-owned settings and a blank test window are shown.
+﻿// Opt-in native focus/WM_HOTKEY regression; only self-owned settings and a blank test window are shown.
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
-using Stackshot;
+using ScreenCraft;
 class SettingsHotkeyProbe
 {
     sealed class Registrar:IHotkeyRegistrar

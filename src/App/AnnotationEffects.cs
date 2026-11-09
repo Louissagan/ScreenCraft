@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Imaging;
-namespace Stackshot
+namespace ScreenCraft
 {
     public partial class Shape{public int RedactionMode;internal int CachedRedactionMode;public float WatermarkAngle=-25,WatermarkSpacing=100;}
     public static partial class Painter

@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Web.Script.Serialization;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed partial class Preferences
     {

@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Globalization;
-namespace Stackshot
+namespace ScreenCraft
 {
     public static class ColorValues
     {
@@ -46,7 +46,7 @@ namespace Stackshot
         {
             if(sampledColor==null)return false;
             if(!ScreenRect(Crop).Contains(position))return true;
-            PointF p=ToImg(position,true);Color c=Img.GetPixel(Math.Max(0,Math.Min(Img.Width-1,(int)p.X)),Math.Max(0,Math.Min(Img.Height-1,(int)p.Y)));
+            PointF p=ToImg(position,true);Color c=Img.GetPixel(Math.Max(0,Math.Min(Img.Width-1,(int)Math.Round(p.X))),Math.Max(0,Math.Min(Img.Height-1,(int)Math.Round(p.Y))));
             var action=sampledColor;CancelColorPick();action(c);return true;
         }
     }

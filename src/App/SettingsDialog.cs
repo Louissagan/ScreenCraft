@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed class SettingsDialog:Form
     {
@@ -14,7 +14,7 @@ namespace Stackshot
         const string KeyHint="点击快捷键栏后按组合键；Delete 清除，Esc 恢复，Tab 切换。";
         public SettingsDialog(Preferences previous,string dataPath,Func<Preferences,string> save,string runtimeStatus=null)
         {
-            Text="ScreenCraft 设置 · "+Application.ProductVersion;Icon=ShotStack.AppIcon;StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.Sizable;ControlBox=true;MinimizeBox=true;MaximizeBox=true;
+            Text="ScreenCraft 设置 · "+Application.ProductVersion;Icon=CaptureHost.AppIcon;StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.Sizable;ControlBox=true;MinimizeBox=true;MaximizeBox=true;
             Font=new Font("Microsoft YaHei UI",9F);AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.Dpi;
             BackColor=PreferencesLook.Background;ForeColor=PreferencesLook.Ink;ClientSize=new Size(860,680);MinimumSize=new Size(720,520);DoubleBuffered=true;
             string[] labels={"常规","截图","快捷键","工具栏","OCR 与取色","关于","贴图"},icons={"gear","crop","keyboard","rect","ocr","info","stack"};

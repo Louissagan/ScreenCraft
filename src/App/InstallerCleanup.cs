@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 using System.IO;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal static class InstallerCleanup
     {

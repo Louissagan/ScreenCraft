@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public interface IHotkeyRegistrar:IDisposable{bool Register(int id,uint modifiers,Keys key);void Unregister(int id);}
     public sealed class WindowsHotkeyRegistrar:NativeWindow,IHotkeyRegistrar

@@ -1,17 +1,17 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
-namespace Stackshot {
+namespace ScreenCraft {
  public static class ScreenCraftProgram {
   [STAThread] public static void Main(string[] args) {
    try {
     if(InstallerCleanup.IsCommand(args)){try{InstallerCleanup.Handle(args);}catch{Environment.ExitCode=1603;}return;}
     Native.SetProcessDpiAwarenessContext(new IntPtr(-4));
     Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-    I18n.Apply("en"); Ds.Apply(0); Theme.Init();
+    Theme.Init();
     string sid=System.Security.Principal.WindowsIdentity.GetCurrent().User.Value;bool created;
     using(var mutex=new Mutex(true,"Local\\ScreenCraft-"+sid,out created)) {
      if(!created){try{using(var open=EventWaitHandle.OpenExisting(StartupPolicy.WakeEvent(sid,StartupPolicy.OpensSettings(args))))open.Set();}catch(WaitHandleCannotBeOpenedException){}return;}
@@ -30,7 +30,7 @@ namespace Stackshot {
   }
  }
  public class CraftHome : Form {
-  readonly ShotStack host=new ShotStack();
+  readonly CaptureHost host=new CaptureHost();
   readonly NotifyIcon tray=new NotifyIcon();
   readonly TransactionalHotkeys hotkeys=new TransactionalHotkeys(new WindowsHotkeyRegistrar());
   readonly PreferenceStore preferencesStore;
@@ -42,7 +42,7 @@ namespace Stackshot {
   StartupToast startupToast;
   System.Collections.Generic.List<Form> scrollHidden;
   public CraftHome(string[] args) {
-   ShotStack.Running=host;Icon=ShotStack.AppIcon;Text="ScreenCraft · 后台";ShowInTaskbar=false;FormBorderStyle=FormBorderStyle.None;AutoScaleMode=AutoScaleMode.Dpi;
+   CaptureHost.Running=host;Icon=CaptureHost.AppIcon;Text="ScreenCraft · 后台";ShowInTaskbar=false;FormBorderStyle=FormBorderStyle.None;AutoScaleMode=AutoScaleMode.Dpi;
    string basePath=AppDomain.CurrentDomain.BaseDirectory;bool portable=File.Exists(Path.Combine(basePath,"portable.flag"));
    string userData=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"ScreenCraft");preferencesStore=PreferenceStore.Select(portable?Path.Combine(basePath,"Data"):userData,userData);
    preferences=preferencesStore.Load();host.ToolbarChanged=delegate(ToolbarSettings t){preferences.Toolbar=t;preferencesStore.Save(preferences);};try{string actualStartup=new UserStartupEntry().Read();preferences.RunOnStartup=StartupCommand.Matches(actualStartup,Application.ExecutablePath);if(actualStartup!=null&&!preferences.RunOnStartup)preferencesStore.Warning="此用户的 ScreenCraft 启动项指向其他位置，可在常规设置中主动切换到当前程序。";}catch(Exception){preferences.RunOnStartup=false;preferencesStore.Warning="无法读取当前用户启动项，请在常规设置中检查。";}Settings.DataDir=preferencesStore.DirectoryPath;host.OcrLanguage=preferences.OcrLanguage;host.ColorPreferences=preferences;
@@ -101,7 +101,7 @@ namespace Stackshot {
   void PastePin(){try{using(var image=Clipboard.GetImage()){if(image==null){if(Clipboard.ContainsText())OpenMemo(Clipboard.GetText());else MessageBox.Show("剪贴板中没有图片或文字。");return;}PinWindow.Open(new Bitmap(image));}}catch(Exception ex){MessageBox.Show("无法读取剪贴板："+ex.Message);}}
   void OpenMemo(string initial){try{if(initial==null&&Clipboard.ContainsText())initial=Clipboard.GetText();using(var memo=new TextMemoDialog(initial))memo.ShowDialog(this);}catch(Exception ex){host.Notify("文字备忘无法打开",ex.Message);}}
   void PinFiles(){using(var d=new OpenFileDialog{Filter="图片或可编辑工程|*.png;*.jpg;*.jpeg;*.bmp;*.sccraft",Multiselect=true})if(d.ShowDialog(this)==DialogResult.OK)foreach(var file in d.FileNames)TryPinFile(file);}
-  void TryPinFile(string path){try{if(string.Equals(Path.GetExtension(path),".sccraft",StringComparison.OrdinalIgnoreCase))PinWindow.Open(AnnotationDocument.Open(path));else PinWindow.Open(ShotStack.LoadFull(path));}catch(Exception ex){MessageBox.Show(this,"无法贴图："+ex.Message);}}
+  void TryPinFile(string path){try{if(string.Equals(Path.GetExtension(path),".sccraft",StringComparison.OrdinalIgnoreCase))PinWindow.Open(AnnotationDocument.Open(path));else PinWindow.Open(CaptureHost.LoadFull(path));}catch(Exception ex){MessageBox.Show(this,"无法贴图："+ex.Message);}}
   void ShowPins(){new PinManagerWindow().Show();}
   void ShowSettings(){
    if(activeSettings!=null&&!activeSettings.IsDisposed){activeSettings.WindowState=FormWindowState.Normal;activeSettings.Show();activeSettings.Activate();return;}

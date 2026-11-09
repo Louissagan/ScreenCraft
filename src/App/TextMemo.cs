@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal sealed class TextMemoStyle
     {
@@ -27,7 +27,7 @@ namespace Stackshot
         internal Func<string> ReadClipboardText=Clipboard.GetText;internal Action<Bitmap> PinOutput=delegate(Bitmap image){PinWindow.Open(image);};
         internal TextMemoDialog(string initialText)
         {
-            Text="ScreenCraft · 文字备忘贴图";Icon=ShotStack.AppIcon;Font=new Font("Microsoft YaHei UI",9);BackColor=PreferencesLook.Background;ClientSize=new Size(720,660);MinimumSize=new Size(680,640);StartPosition=FormStartPosition.CenterParent;DoubleBuffered=true;text.Text=initialText??"";
+            Text="ScreenCraft · 文字备忘贴图";Icon=CaptureHost.AppIcon;Font=new Font("Microsoft YaHei UI",9);BackColor=PreferencesLook.Background;ClientSize=new Size(720,660);MinimumSize=new Size(680,640);StartPosition=FormStartPosition.CenterParent;DoubleBuffered=true;text.Text=initialText??"";
             heading.Font=new Font(Font.FontFamily,16,FontStyle.Bold);heading.ForeColor=PreferencesLook.Ink;hint.ForeColor=PreferencesLook.Muted;status.ForeColor=Color.FromArgb(181,47,56);input=new PreferencesField(text,660){Height=148};
             group.AddRow(new PreferencesRow("字体",family,160));group.AddRow(new PreferencesRow("字号（px）",new PreferencesField(fontSize,100),100));group.AddRow(new PreferencesRow("边距（px）",new PreferencesField(padding,100),100));group.AddRow(new PreferencesRow("最大宽度（px）",new PreferencesField(maxWidth,100),100));group.AddRow(new PreferencesRow("文字颜色",ink,140));group.AddRow(new PreferencesRow("背景颜色",background,140));Controls.AddRange(new Control[]{heading,hint,input,group,preview,status,read,pin});
             EventHandler changed=delegate{debounce.Stop();debounce.Start();};text.TextChanged+=changed;fontSize.ValueChanged+=changed;padding.ValueChanged+=changed;maxWidth.ValueChanged+=changed;family.SelectionChanged+=changed;debounce.Tick+=delegate{debounce.Stop();RefreshPreview();};

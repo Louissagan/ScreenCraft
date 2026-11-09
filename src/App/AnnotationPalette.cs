@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal sealed class PaletteSwatch:PreferencesPaintButton
     {

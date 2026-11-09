@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public static partial class CaptureKeyboard
     {
@@ -16,6 +16,6 @@ namespace Stackshot
     public partial class RegionPicker
     {
         bool guideSeen;
-        bool GuidesVisible{get{return guideSeen&&(mode==Mode.Image||mode==Mode.Text||mode==Mode.Scroll)&&!(adjusting&&barRect.Contains(cur))&&(ShotStack.Running==null||ShotStack.Running.ColorPreferences==null||ShotStack.Running.ColorPreferences.ShowCaptureGuides);}}
+        bool GuidesVisible{get{return guideSeen&&(mode==Mode.Image||mode==Mode.Text||mode==Mode.Scroll)&&!(adjusting&&barRect.Contains(cur))&&(CaptureHost.Running==null||CaptureHost.Running.ColorPreferences==null||CaptureHost.Running.ColorPreferences.ShowCaptureGuides);}}
     }
 }

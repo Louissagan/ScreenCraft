@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using Stackshot;
+using ScreenCraft;
 
 // Opt-in native regression probe. Input is directed only to the synthetic overlay in this process.
 class CaptureDragProbe {
@@ -71,7 +71,7 @@ class CaptureDragProbe {
                 o.Refresh();c.Refresh();Application.DoEvents();
                 using(var repainted=Pic(o)){
                     int changed=Differences(after,repainted);
-                    Console.WriteLine("120 moves="+ms+" ms; final crop="+c.Crop+"; changed pixels after explicit repaint="+changed+"; mid-drag repaint difference="+duringMismatch+"; monitor scale="+ShotStack.ScaleFor(Screen.FromControl(o)));
+                    Console.WriteLine("120 moves="+ms+" ms; final crop="+c.Crop+"; changed pixels after explicit repaint="+changed+"; mid-drag repaint difference="+duringMismatch+"; monitor scale="+CaptureHost.ScaleFor(Screen.FromControl(o)));
                     if(c.Crop!=new Rectangle(80,65,690,240)||duringMismatch!=0||changed!=0)return 1;
                 }
             }

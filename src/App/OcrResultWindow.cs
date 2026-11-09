@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed class OcrResultWindow:Form
     {
@@ -18,7 +18,7 @@ namespace Stackshot
         public OcrResultWindow(Bitmap ownedSource,string preferredLanguage):this(ownedSource,preferredLanguage,new LocalOcrService()){}
         internal OcrResultWindow(Bitmap ownedSource,string preferredLanguage,LocalOcrService backend)
         {
-            source=ownedSource;service=backend;Icon=ShotStack.AppIcon;Text="ScreenCraft · 本地文字识别";ClientSize=new Size(760,520);MinimumSize=new Size(500,360);StartPosition=FormStartPosition.CenterParent;Font=new Font("Microsoft YaHei UI",10);AutoScaleMode=AutoScaleMode.Dpi;
+            source=ownedSource;service=backend;Icon=CaptureHost.AppIcon;Text="ScreenCraft · 本地文字识别";ClientSize=new Size(760,520);MinimumSize=new Size(500,360);StartPosition=FormStartPosition.CenterParent;Font=new Font("Microsoft YaHei UI",10);AutoScaleMode=AutoScaleMode.Dpi;
             AutoScaleDimensions=new SizeF(96,96);BackColor=PreferencesLook.Background;Padding=new Padding(12);
             status.ForeColor=PreferencesLook.Muted;result.BorderStyle=BorderStyle.None;
             language.Format+=delegate(object sender,ListControlConvertEventArgs e){if(Equals(e.ListItem,"auto"))e.Value="自动选择";};

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Diagnostics;
@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Windows.Globalization;
 using Windows.Media.Ocr;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed class OcrCapabilities
     {

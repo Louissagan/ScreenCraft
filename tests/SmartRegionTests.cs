@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
-namespace Stackshot
+namespace ScreenCraft
 {
     static class SmartRegionTests
     {

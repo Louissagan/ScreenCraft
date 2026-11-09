@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-namespace Stackshot
+namespace ScreenCraft
 {
     public partial class Shape{public bool SmoothPen,FreehandArrow,ArrowWhiteOutline;}
     public static partial class Painter

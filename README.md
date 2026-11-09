@@ -1,4 +1,4 @@
-# ScreenCraft
+﻿# ScreenCraft
 
 一个 Windows 截图、标注和贴图工具。截图后可以直接添加箭头、文字和备注，也可以把图片钉在桌面上，方便对照资料。
 
@@ -14,7 +14,7 @@
 
 ## 使用
 
-支持 Windows 10 / 11（64 位），需要 .NET Framework 4.8。当前版本为开发预览版。
+支持 Windows 10 / 11（64 位），需要 .NET Framework 4.8。当前源码为 0.10 开发预览版，截图与标注内核已经重写。
 
 启动后程序会留在系统托盘：
 
@@ -46,4 +46,4 @@ cd ScreenCraft
 
 ## 许可证
 
-本项目采用 [MIT 许可证](LICENSE)。项目基于 [Stackshot](https://github.com/rubenitx/stackshot) 的部分代码开发，保留了原作者的版权和 MIT 许可声明。其他第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+本项目采用 [MIT 许可证](LICENSE)。早期版本使用过 Stackshot 代码；0.10 已替换运行时内核，历史来源与版权声明继续保留。详情见 [重写记录](docs/CORE_REWRITE.md) 和 [第三方说明](THIRD_PARTY_NOTICES.md)。

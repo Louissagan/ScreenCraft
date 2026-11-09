@@ -1,14 +1,14 @@
-// ScreenCraft host adapters for the reused MIT Stackshot capture/editor modules.
+﻿// ScreenCraft application host and Windows integration boundaries.
 using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
-namespace Stackshot {
- public partial class ShotStack {
+namespace ScreenCraft {
+ public partial class CaptureHost {
   readonly Control dispatcher = new Control();
-  public ShotStack() { var handle=dispatcher.Handle; }
+  public CaptureHost() { var handle=dispatcher.Handle; }
   public void Ui(Action action) { if(dispatcher.IsDisposed)return; if(dispatcher.InvokeRequired)dispatcher.BeginInvoke(action);else action(); }
-  public static ShotStack Running;
+  public static CaptureHost Running;
   public Action<ToolbarSettings> ToolbarChanged;
   public static bool Test;
   public static Icon AppIcon = TrayBrand.Create();
@@ -54,4 +54,4 @@ namespace Stackshot {
   public void Save() {System.IO.Directory.CreateDirectory(DataDir);string path=Path.Combine(DataDir,"backdrop.json");string temp=path+".tmp";try{File.WriteAllText(temp,new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(this));if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);}finally{if(File.Exists(temp))File.Delete(temp);}}
  }
 }
-namespace Stackshot { public enum ButtonKind { Primary, Secondary, Plain, Danger, Glass } }
+namespace ScreenCraft { public enum ButtonKind { Primary, Secondary, Plain, Danger, Glass } }

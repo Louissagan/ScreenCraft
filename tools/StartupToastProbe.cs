@@ -1,4 +1,4 @@
-// Opt-in visible native probe: captures only the startup toast created by this process.
+﻿// Opt-in visible native probe: captures only the startup toast created by this process.
 using System;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -16,7 +16,7 @@ class StartupToastProbe
     {
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         var assembly=Assembly.LoadFrom(Path.GetFullPath(args[0]));var output=Path.GetFullPath(args[1]);Directory.CreateDirectory(output);
-        var type=assembly.GetType("Stackshot.StartupToast",true);
+        var type=assembly.GetType("ScreenCraft.StartupToast",true);
         using(var form=(Form)Activator.CreateInstance(type,BindingFlags.NonPublic|BindingFlags.Instance,null,new object[]{Screen.PrimaryScreen.WorkingArea,"Alt+A",false},null)){
             form.Show();Application.DoEvents();
             ((Timer)type.GetField("timer",BindingFlags.NonPublic|BindingFlags.Instance).GetValue(form)).Stop();

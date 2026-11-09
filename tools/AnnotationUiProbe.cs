@@ -1,4 +1,4 @@
-// Opt-in visible test of self-owned synthetic windows; no desktop content is used.
+﻿// Opt-in visible test of self-owned synthetic windows; no desktop content is used.
 using System;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -7,7 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using Stackshot;
+using ScreenCraft;
 class AnnotationUiProbe
 {
     [DllImport("user32.dll")]static extern bool PrintWindow(IntPtr hwnd,IntPtr dc,uint flags);

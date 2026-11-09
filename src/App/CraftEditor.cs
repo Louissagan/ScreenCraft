@@ -1,16 +1,16 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed class CraftEditor : Form
     {
         readonly Canvas canvas;
         readonly AnnotationInspector inspector;
         readonly Action<AnnotationDocument> updatePin;readonly int pinTurns;readonly bool pinFlipX,pinFlipY;
-        public Action RestoreSourceFocus;internal Action<Bitmap> CopyOutput=ShotStack.CopyImage;internal Action<string> CommandError;
+        public Action RestoreSourceFocus;internal Action<Bitmap> CopyOutput=CaptureHost.CopyImage;internal Action<string> CommandError;
         readonly StatusStrip status=new StatusStrip();
         readonly ToolStripStatusLabel hint=new ToolStripStatusLabel();
         readonly ToolTip tips=new ToolTip();readonly FlowLayoutPanel secondary=new FlowLayoutPanel{Dock=DockStyle.Top,Height=46,Padding=new Padding(8,4,8,4),BackColor=Color.White};readonly CaptureSlider quickSize=new CaptureSlider{Minimum=1,Maximum=100,Width=120};readonly Label quickValue=new Label{Width=90,Height=34,TextAlign=ContentAlignment.MiddleCenter};bool syncingQuick;
@@ -18,7 +18,7 @@ namespace Stackshot
         public CraftEditor(Bitmap image):this(AnnotationDocument.FromImage(image),null){}
         public CraftEditor(AnnotationDocument ownedDocument,Action<AnnotationDocument> update)
         {
-            pinTurns=ownedDocument.PinQuarterTurns;pinFlipX=ownedDocument.PinFlipX;pinFlipY=ownedDocument.PinFlipY;updatePin=update;Icon=ShotStack.AppIcon;Text="ScreenCraft · 标注图片";AutoScaleMode=AutoScaleMode.Dpi;AutoScaleDimensions=new SizeF(96,96);
+            pinTurns=ownedDocument.PinQuarterTurns;pinFlipX=ownedDocument.PinFlipX;pinFlipY=ownedDocument.PinFlipY;updatePin=update;Icon=CaptureHost.AppIcon;Text="ScreenCraft · 标注图片";AutoScaleMode=AutoScaleMode.Dpi;AutoScaleDimensions=new SizeF(96,96);
             ClientSize=new Size(1180,760);MinimumSize=new Size(820,540);StartPosition=FormStartPosition.CenterScreen;Font=new Font("Microsoft YaHei UI",10);KeyPreview=true;
             try{canvas=new Canvas(new Bitmap(ownedDocument.Source)){Dock=DockStyle.Fill,Ui=DeviceDpi/96f,Bg=new Settings()};canvas.LoadDocument(ownedDocument);}finally{ownedDocument.Dispose();}
             inspector=new AnnotationInspector(canvas);
@@ -29,8 +29,8 @@ namespace Stackshot
             var actions=tools;
             var undo=Button(actions,"撤销 Ctrl+Z",canvas.Undo);var redo=Button(actions,"重做 Ctrl+Y",canvas.Redo);Button(actions,"复制完成 Enter",Copy);
             Button(actions,update==null?"钉在屏幕 P":"更新此贴图 P",Pin);Button(actions,"保存 PNG",Save);Button(actions,"保存可编辑工程",SaveProject);
-            Button(actions,"本地 OCR",delegate{using(var b=RenderPresentation()){if(ShotStack.Running!=null)ShotStack.Running.CopyText(b,null);}});
-            Button(actions,"取原图色 C",PickColor);Button(actions,"滚动长截图",delegate{if(ShotStack.Running!=null&&ShotStack.Running.BeginScroll!=null)ShotStack.Running.BeginScroll();});
+            Button(actions,"本地 OCR",delegate{using(var b=RenderPresentation()){if(CaptureHost.Running!=null)CaptureHost.Running.CopyText(b,null);}});
+            Button(actions,"取原图色 C",PickColor);Button(actions,"滚动长截图",delegate{if(CaptureHost.Running!=null&&CaptureHost.Running.BeginScroll!=null)CaptureHost.Running.BeginScroll();});
             Button(actions,"分段导出 PNG",SaveSegments);Button(actions,"图片美化",delegate{using(var dialog=new BackgroundDialog(canvas))dialog.ShowDialog(this);});
             Button(actions,"取消 Esc",Close);
             status.Items.Add(hint);Controls.Add(canvas);Controls.Add(inspector);Controls.Add(status);Controls.Add(secondary);Controls.Add(tools);
@@ -65,7 +65,7 @@ namespace Stackshot
                 secondary.Visible=canvas.ActiveKind!=Tool.Redact;}finally{syncingQuick=false;}};
         }
         protected override void Dispose(bool disposing){if(disposing)tips.Dispose();base.Dispose(disposing);}
-        public static CraftEditor OpenFile(string path){return string.Equals(Path.GetExtension(path),".sccraft",StringComparison.OrdinalIgnoreCase)?new CraftEditor(AnnotationDocument.Open(path),null):new CraftEditor(ShotStack.LoadFull(path));}
+        public static CraftEditor OpenFile(string path){return string.Equals(Path.GetExtension(path),".sccraft",StringComparison.OrdinalIgnoreCase)?new CraftEditor(AnnotationDocument.Open(path),null):new CraftEditor(CaptureHost.LoadFull(path));}
         internal void SafeCommand(Action action){try{action();}catch(Exception ex){hint.Text="操作失败："+ex.Message;if(CommandError!=null)CommandError(hint.Text);}}
         AnnotationDocument ExportWithView(){var doc=canvas.ExportDocument();doc.PinQuarterTurns=pinTurns;doc.PinFlipX=pinFlipX;doc.PinFlipY=pinFlipY;return doc;}
         Bitmap RenderPresentation(){using(var raw=canvas.Render())return PinViews.Render(raw,pinTurns,pinFlipX,pinFlipY);}
@@ -73,7 +73,7 @@ namespace Stackshot
         void Pin(){canvas.CommitText();var doc=ExportWithView();try{if(updatePin!=null)updatePin(doc);else PinWindow.Open(doc);}catch{doc.Dispose();throw;}Close();}
         void Save(){canvas.CommitText();using(var d=new SaveFileDialog{Filter="PNG 图片|*.png",FileName="截图.png"})if(d.ShowDialog(this)==DialogResult.OK)using(var b=RenderPresentation())ImageFiles.SavePng(b,d.FileName);}
         void SaveProject(){canvas.CommitText();using(var d=new SaveFileDialog{Filter="可编辑工程（保留原图，分享请用 PNG）|*.sccraft",FileName="标注工程.sccraft"})if(d.ShowDialog(this)==DialogResult.OK)using(var doc=ExportWithView())doc.Save(d.FileName);}
-        void PickColor(){canvas.BeginColorPick(delegate(Color c){var p=ShotStack.Running;var home=p==null?null:p.ColorPreferences;string value=ColorValues.Format(c,home==null?"RGB":home.ColorFormat,home==null||home.ColorUpper);try{Clipboard.SetText(value);hint.Text="已复制原图颜色 "+value;}catch(System.Runtime.InteropServices.ExternalException){hint.Text="颜色 "+value+"；剪贴板正被占用，请重新取色复制。";}});hint.Text="点击原图像素复制颜色；Esc 取消取色。";canvas.Focus();}
+        void PickColor(){canvas.BeginColorPick(delegate(Color c){var p=CaptureHost.Running;var home=p==null?null:p.ColorPreferences;string value=ColorValues.Format(c,home==null?"RGB":home.ColorFormat,home==null||home.ColorUpper);try{Clipboard.SetText(value);hint.Text="已复制原图颜色 "+value;}catch(System.Runtime.InteropServices.ExternalException){hint.Text="颜色 "+value+"；剪贴板正被占用，请重新取色复制。";}});hint.Text="点击原图像素复制颜色；Esc 取消取色。";canvas.Focus();}
         void SaveSegments(){using(var d=new FolderBrowserDialog{Description="选择空目录，按每段 4000 行导出当前图片"})if(d.ShowDialog(this)==DialogResult.OK)using(var b=RenderPresentation()){var files=SegmentedPng.Export(b,d.SelectedPath,4000);hint.Text="已导出 "+files.Length+" 段 PNG。";}}
         protected override bool ProcessCmdKey(ref Message msg,Keys keys)
         {

@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed partial class CaptureOverlay
     {
@@ -32,7 +32,7 @@ namespace Stackshot
             scaleArea=area;
             var screenArea=area;
             screenArea.Offset(desktop.Location);
-            SetChromeScale(ShotStack.ScaleFor(Screen.FromRectangle(screenArea)));
+            SetChromeScale(CaptureHost.ScaleFor(Screen.FromRectangle(screenArea)));
         }
 
         internal void SetChromeScale(float scale)

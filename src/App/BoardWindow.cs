@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Collections.Generic;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal sealed class BoardView:Control
     {
@@ -64,7 +64,7 @@ namespace Stackshot
         internal Func<Bitmap> ReadClipboard=delegate{using(var image=Clipboard.GetImage())return image==null?null:new Bitmap(image);};internal Action<Bitmap> PinImage=delegate(Bitmap image){PinWindow.Open(image);};
         internal BoardWindow(BoardDocument owned=null,string projectPath=null)
         {
-            Document=owned??new BoardDocument();path=projectPath;View=new BoardView(Document){Dock=DockStyle.Fill};Text="ScreenCraft · 拼图画板";Icon=ShotStack.AppIcon;Font=new Font("Microsoft YaHei UI",9);ClientSize=new Size(1100,760);MinimumSize=new Size(760,520);StartPosition=FormStartPosition.CenterParent;BackColor=PreferencesLook.Background;
+            Document=owned??new BoardDocument();path=projectPath;View=new BoardView(Document){Dock=DockStyle.Fill};Text="ScreenCraft · 拼图画板";Icon=CaptureHost.AppIcon;Font=new Font("Microsoft YaHei UI",9);ClientSize=new Size(1100,760);MinimumSize=new Size(760,520);StartPosition=FormStartPosition.CenterParent;BackColor=PreferencesLook.Background;
             Add("open","打开画板工程",Open);Add("project","保存画板工程 Ctrl+S",Save);Add("image","添加图片",Import);Add("paste","粘贴图片 Ctrl+V",Paste);Add("stack","加入当前全部贴图",delegate{foreach(var pin in PinWindow.All){var id=Document.AddImage(pin.ViewImage(),new PointF(Document.Items.Length*28,Document.Items.Length*28));View.SelectedId=id;}View.Fit();});
             undo=Add("undo","撤销 Ctrl+Z",Document.Undo);redo=Add("redo","重做 Ctrl+Y",Document.Redo);Add("copy","复制选中图片 Ctrl+D",delegate{View.SelectedId=Document.Duplicate(View.SelectedId);},true);Add("front","上移一层",delegate{Document.Reorder(View.SelectedId,1);},true);Add("back","下移一层",delegate{Document.Reorder(View.SelectedId,-1);},true);Add("rotate","顺时针旋转 90°",delegate{Document.Change(View.SelectedId,delegate(BoardItem item){item.Turns=(item.Turns+1)%4;});},true);Add("cancel","删除选中图片",delegate{Document.Delete(View.SelectedId);},true);
             CaptureIconButton backgroundColor=null;backgroundColor=Add("color","画板背景颜色",delegate{CraftColors.Show(backgroundColor,Document.Background.A==0?Color.White:Document.Background,Document.SetBackground);});Add("no-fill","透明背景",delegate{Document.SetBackground(Color.Transparent);});Add("crop","适应全部图片",View.Fit);Add("rect","视图 100%",delegate{View.ZoomAt(1/View.Zoom,new Point(View.Width/2,View.Height/2));});Add("save","导出完整画板 PNG",Export);Add("pin","选中图片独立贴图",PinSelected,true);
@@ -79,7 +79,7 @@ namespace Stackshot
             foreach(var button in selectionActions)button.Enabled=selected;
         }
         void UpdateStatus(){UpdateActions();status.Text=Document.Items.Length+" 张图片 · 滚轮缩放视图 · 右键拖动画布 · 拖右下角等比缩放 · Alt 关闭吸附";Text="ScreenCraft · 拼图画板"+(Document.Dirty?" *":"");}
-        void AddFile(string file){View.SelectedId=Document.AddImage(ShotStack.LoadFull(file),new PointF(Document.Items.Length*28,Document.Items.Length*28));}
+        void AddFile(string file){View.SelectedId=Document.AddImage(CaptureHost.LoadFull(file),new PointF(Document.Items.Length*28,Document.Items.Length*28));}
         void Import(){using(var dialog=new OpenFileDialog{Filter="图片|*.png;*.jpg;*.jpeg;*.bmp",Multiselect=true})if(dialog.ShowDialog(this)==DialogResult.OK){foreach(var file in dialog.FileNames)AddFile(file);View.Fit();}}
         internal void Paste(){var image=ReadClipboard();if(image==null)throw new InvalidOperationException("剪贴板中没有图片。");View.SelectedId=Document.AddImage(image,View.World(new Point(View.Width/2,View.Height/2)));View.Invalidate();}
         void Save(){if(path==null){using(var dialog=new SaveFileDialog{Filter="ScreenCraft 画板|*.scboard",FileName="参考图画板.scboard"}){if(dialog.ShowDialog(this)!=DialogResult.OK)return;path=dialog.FileName;}}Document.Save(path);UpdateStatus();}

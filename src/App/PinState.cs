@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed class PinState
     {

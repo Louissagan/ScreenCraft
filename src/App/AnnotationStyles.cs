@@ -1,10 +1,10 @@
-// ScreenCraft extensions to the MIT Stackshot Shape/Painter model.
+﻿// ScreenCraft annotation styles shared by preview and export.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
-namespace Stackshot
+namespace ScreenCraft
 {
     public partial class Shape
     {

@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     static class InPlaceCaptureTests
     {
