@@ -34,7 +34,7 @@ namespace ScreenCraft
             Button(actions,"分段导出 PNG",SaveSegments);Button(actions,"图片美化",delegate{using(var dialog=new BackgroundDialog(canvas))dialog.ShowDialog(this);});
             Button(actions,"取消 Esc",Close);
             status.Items.Add(hint);Controls.Add(canvas);Controls.Add(inspector);Controls.Add(status);Controls.Add(secondary);Controls.Add(tools);
-            canvas.StateChanged+=delegate{undo.Enabled=canvas.CanUndo;redo.Enabled=canvas.CanRedo;foreach(var pair in toolButtons)pair.Value.Selected=pair.Key==Tool.Callout?canvas.ActiveHasNote:canvas.ActiveKind==pair.Key;hint.Text=canvas.SelectedShape==null?"框选后标注；点选对象可移动，拖动控制点可调整；文字输入时快捷键暂停。":"已选中标注；Delete 删除，方向键移动，Shift+方向键 10px。";};
+            canvas.StateChanged+=delegate{undo.Enabled=canvas.CanUndo;redo.Enabled=canvas.CanRedo;foreach(var pair in toolButtons)pair.Value.Selected=pair.Key==Tool.Callout?canvas.ActiveHasNote:canvas.ActiveKind==pair.Key;hint.Text=canvas.SelectedShape==null?"框选后标注；点选对象可移动，拖动控制点可调整；文字输入时快捷键暂停。":"拖动上方圆点旋转，Shift 吸附 15°；Ctrl+[ / ] 调整前后顺序。";};
             BuildSecondary();canvas.SetTool(Tool.Rect);Shown+=delegate{canvas.Focus();};
             AllowDrop=true;DragEnter+=delegate(object sender,DragEventArgs e){e.Effect=e.Data.GetDataPresent(DataFormats.FileDrop)?DragDropEffects.Copy:DragDropEffects.None;};
             FormClosed+=delegate{if(RestoreSourceFocus!=null)RestoreSourceFocus();};
@@ -42,12 +42,14 @@ namespace ScreenCraft
         }
         internal Canvas AnnotationCanvas{get{return canvas;}}
         CaptureIconButton Button(FlowLayoutPanel strip,string name,Action action){var b=new CaptureIconButton{Glyph=EditorGlyph(name),AccessibleName=name};tips.SetToolTip(b,name);b.Click+=delegate{SafeCommand(action);};strip.Controls.Add(b);return b;}
-        static string EditorGlyph(string name){if(name=="颜色")return "color";if(name=="标注"||name=="点标注")return "callout";if(name=="透明底文字")return "no-fill";if(name=="色底白字")return "fill";if(name.StartsWith("矩形"))return "rect";if(name.StartsWith("椭圆"))return "ellipse";if(name.StartsWith("箭头"))return "arrow";if(name.StartsWith("直线"))return "line";if(name.StartsWith("画笔"))return "pen";if(name.StartsWith("文字"))return "text";if(name.StartsWith("序号"))return "counter";if(name.StartsWith("云线"))return "cloud";if(name.StartsWith("马赛克"))return "pixelate";if(name.StartsWith("实色"))return "redact";if(name.StartsWith("裁剪"))return "crop";if(name.StartsWith("撤销"))return "undo";if(name.StartsWith("重做"))return "redo";if(name.StartsWith("复制"))return "copy";if(name.StartsWith("钉")||name.StartsWith("更新"))return "pin";if(name.StartsWith("保存可"))return "project";if(name.StartsWith("保存")||name.StartsWith("分段"))return "save";if(name.StartsWith("本地"))return "ocr";if(name.StartsWith("取原"))return "color";if(name.StartsWith("滚动"))return "scroll";if(name.StartsWith("图片美化"))return "image";if(name.StartsWith("取消"))return "cancel";return "settings";}
+        static string EditorGlyph(string name){if(name=="自动闭合手绘线")return "pen-closed";if(name.StartsWith("顺时针旋转"))return "rotate";if(name=="颜色")return "color";if(name=="标注"||name=="点标注")return "callout";if(name=="透明底文字")return "no-fill";if(name=="色底白字")return "fill";if(name.StartsWith("矩形"))return "rect";if(name.StartsWith("椭圆"))return "ellipse";if(name.StartsWith("箭头"))return "arrow";if(name.StartsWith("直线"))return "line";if(name.StartsWith("画笔"))return "pen";if(name.StartsWith("文字"))return "text";if(name.StartsWith("序号"))return "counter";if(name.StartsWith("云线"))return "cloud";if(name.StartsWith("马赛克"))return "pixelate";if(name.StartsWith("实色"))return "redact";if(name.StartsWith("裁剪"))return "crop";if(name.StartsWith("撤销"))return "undo";if(name.StartsWith("重做"))return "redo";if(name.StartsWith("复制"))return "copy";if(name.StartsWith("钉")||name.StartsWith("更新"))return "pin";if(name.StartsWith("保存可"))return "project";if(name.StartsWith("保存")||name.StartsWith("分段"))return "save";if(name.StartsWith("本地"))return "ocr";if(name.StartsWith("取原"))return "color";if(name.StartsWith("滚动"))return "scroll";if(name.StartsWith("图片美化"))return "image";if(name.StartsWith("取消"))return "cancel";return "settings";}
         void BuildSecondary(){
             var point=Button(secondary,"点标注",delegate{canvas.SetAnnotationMode(Tool.Callout);canvas.Focus();});
             var cloud=Button(secondary,"云线 W",delegate{canvas.SetAnnotationMode(Tool.Cloud);canvas.Focus();});
             var number=Button(secondary,"序号 N",delegate{canvas.SetAnnotationMode(Tool.Counter);canvas.Focus();});
             CaptureIconButton color=null;color=Button(secondary,"颜色",delegate{CraftColors.Show(color,canvas.ActiveColor,canvas.SetColor,delegate{canvas.BeginColorPick(canvas.SetColor);canvas.Focus();});});
+            var closed=Button(secondary,"自动闭合手绘线",delegate{canvas.SetClosedPen(!(canvas.SelectedShape==null?canvas.DefaultStyle.ClosedPen:canvas.SelectedShape.ClosedPen));});
+            var rotate=Button(secondary,"顺时针旋转 90°",delegate{canvas.RotateSelected(90);});
             var marker=new CaptureSlider{Minimum=8,Maximum=200,Width=100,AccessibleName="标记大小与引线"};var markerLabel=new Label{Text="点大小",Width=64,Height=34,TextAlign=ContentAlignment.MiddleCenter};secondary.Controls.Add(markerLabel);secondary.Controls.Add(marker);marker.ValueChanged+=delegate{if(!syncingQuick)canvas.SetMarkerSize(marker.Value);};
             secondary.Controls.Add(quickSize);secondary.Controls.Add(quickValue);
             quickSize.AccessibleName="当前工具尺寸";
@@ -56,13 +58,13 @@ namespace ScreenCraft
                 else canvas.ChangeDefaultStyle(delegate(AnnotationStyle style){style.MosaicBlock=quickSize.Value;});
             }else if(canvas.ActiveKind==Tool.Text||canvas.ActiveHasNote){canvas.SetTextSize(quickSize.Value);}else if(canvas.SelectedShape!=null)canvas.EditSelected(delegate(Shape shape){shape.Width=quickSize.Value;});else canvas.ChangeDefaultStyle(delegate(AnnotationStyle style){style.Width=quickSize.Value;});};
             canvas.StateChanged+=delegate{syncingQuick=true;try{bool text=canvas.ActiveKind==Tool.Text||canvas.ActiveHasNote;point.Visible=cloud.Visible=number.Visible=canvas.ActiveHasNote;color.Swatch=canvas.ActiveColor;marker.Visible=markerLabel.Visible=canvas.ActiveKind==Tool.Counter||canvas.ActiveKind==Tool.Callout;marker.Value=(int)canvas.ActiveMarkerSize;point.Selected=canvas.ActiveKind==Tool.Callout;cloud.Selected=canvas.ActiveKind==Tool.Cloud;number.Selected=canvas.ActiveKind==Tool.Counter;bool mosaic=canvas.ActiveKind==Tool.Pixelate;
-                var shape=canvas.SelectedShape;
+                var shape=canvas.SelectedShape;closed.Visible=canvas.ActiveKind==Tool.Pen;closed.Selected=shape==null?canvas.DefaultStyle.ClosedPen:shape.ClosedPen;rotate.Visible=canvas.HasSelection;
 
                 int block=shape==null?canvas.DefaultStyle.MosaicBlock:shape.MosaicBlock;
                 float value=canvas.ActiveKind==Tool.Crop?canvas.OutputCornerRadius:mosaic?(block==0?Math.Max(12,Math.Min(canvas.Img.Width,canvas.Img.Height)/45):block):text?canvas.ActiveTextSize:(shape==null?canvas.DefaultStyle.Width:shape.Width);
                 quickSize.Minimum=canvas.ActiveKind==Tool.Crop?0:mosaic?12:text?8:1;quickSize.Maximum=Math.Max(canvas.ActiveKind==Tool.Crop?200:mosaic?64:300,(int)Math.Ceiling(value));
                 quickSize.Value=(int)Math.Round(value);quickValue.Text=(canvas.ActiveKind==Tool.Crop?"导出圆角 ":mosaic?"色块 ":text?"字号 ":"线宽 ")+quickSize.Value;
-                secondary.Visible=canvas.ActiveKind!=Tool.Redact;}finally{syncingQuick=false;}};
+                secondary.Visible=canvas.ActiveKind!=Tool.Redact||canvas.HasSelection;}finally{syncingQuick=false;}};
         }
         protected override void Dispose(bool disposing){if(disposing)tips.Dispose();base.Dispose(disposing);}
         public static CraftEditor OpenFile(string path){return string.Equals(Path.GetExtension(path),".sccraft",StringComparison.OrdinalIgnoreCase)?new CraftEditor(AnnotationDocument.Open(path),null):new CraftEditor(CaptureHost.LoadFull(path));}
@@ -78,6 +80,7 @@ namespace ScreenCraft
         protected override bool ProcessCmdKey(ref Message msg,Keys keys)
         {
             if(canvas.Typing || inspector.ContainsFocus)return base.ProcessCmdKey(ref msg,keys);
+            if(canvas.ApplyArrangeKey(keys))return true;
             if(keys==(Keys.Control|Keys.Z)){canvas.Undo();return true;}if(keys==(Keys.Control|Keys.Y)){canvas.Redo();return true;}
             if(keys==(Keys.Control|Keys.Shift|Keys.Enter)){SafeCommand(delegate{canvas.CommitText();using(var image=RenderPresentation())CopyOutput(image);});return true;}if(keys==(Keys.Control|Keys.C)||keys==Keys.Enter){SafeCommand(Copy);return true;}if(keys==(Keys.Control|Keys.S)){SafeCommand(Save);return true;}
             if(keys==Keys.Escape){if(canvas.Busy){canvas.CancelGesture();return true;}Close();return true;}

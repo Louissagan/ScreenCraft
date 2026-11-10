@@ -53,6 +53,7 @@ namespace ScreenCraft
             if(source.Points!=null)s.Points=source.Points.Select(map).ToList();
             s.NoteOffset=new PointF(source.NoteOffset.X*sx,source.NoteOffset.Y*sy);
             if(s.Kind==Tool.Text||Painter.HasNote(s.Kind)){s.NoteWidth=Math.Max(60,Math.Min(800,source.NoteWidth*sx));s.FontPx=Math.Max(8,Math.Min(300,source.FontPx*sy));if(source.NoteFontPx>0)s.NoteFontPx=Math.Max(8,Math.Min(300,source.NoteFontPx*sy));s.NoteHeight=Math.Min(10000,source.NoteHeight*sy);s.MarkerSize=Math.Min(200,source.MarkerSize*(sx+sy)/2);}
+            if(source.Rotation!=0){var expected=map(Painter.RotationCenter(source));var actual=Painter.RotationCenter(s);s.Offset(s,expected.X-actual.X,expected.Y-actual.Y);}
             s.DropCache();
         }
         void OutlineGroup(Graphics g){var b=GroupBounds();var frame=new Shape{Kind=Tool.Rect,A=b.Location,B=new PointF(b.Right,b.Bottom),Width=.25f};Outline(g,frame,true);}

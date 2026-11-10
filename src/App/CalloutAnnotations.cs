@@ -57,10 +57,13 @@ namespace ScreenCraft
         public void SetMarkerSize(float size){size=Math.Max(8,Math.Min(200,size));if(selected==null)ChangeDefaultStyle(d=>d.MarkerSize=size);else EditSelected(s=>s.MarkerSize=size);}
         void MoveAnnotation(float dx,float dy)
         {
+            if(!Painter.HasNote(orig.Kind)){selected.Offset(orig,dx,dy);return;}
+            if(orig.Rotation!=0){var local=Painter.RotatePoint(new PointF(dx,dy),PointF.Empty,-orig.Rotation);dx=local.X;dy=local.Y;}
             if(movingNote)selected.NoteOffset=new PointF(orig.NoteOffset.X+dx,orig.NoteOffset.Y+dy);
             else if(movingCounterBadge){selected.B=new PointF(orig.B.X+dx,orig.B.Y+dy);selected.NoteOffset=new PointF(orig.NoteOffset.X-dx,orig.NoteOffset.Y-dy);}
             else if(selected.Kind==Tool.Counter&&selected.LeaderCounter){selected.A=new PointF(orig.A.X+dx,orig.A.Y+dy);selected.B=orig.B;}
-            else{selected.Offset(orig,dx,dy);if(Painter.HasNote(selected.Kind)&&!string.IsNullOrEmpty(selected.Text))selected.NoteOffset=new PointF(orig.NoteOffset.X-dx,orig.NoteOffset.Y-dy);}
+            else{selected.Offset(orig,dx,dy);if(!string.IsNullOrEmpty(selected.Text))selected.NoteOffset=new PointF(orig.NoteOffset.X-dx,orig.NoteOffset.Y-dy);}
+            PreserveRotationFrame(selected,orig);
         }
     }
 }

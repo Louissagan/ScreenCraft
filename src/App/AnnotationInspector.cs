@@ -19,6 +19,7 @@ namespace ScreenCraft
         readonly NumericUpDown x=Number(-100000,100000,0,0),y=Number(-100000,100000,0,0),w=Number(1,100000,100,0),h=Number(1,100000,100,0);
         readonly CheckBox fill=new PreferencesSwitch{Text="启用填充"},simpleArrow=new PreferencesSwitch{Text="细线箭头"};
         readonly PreferencesChoice dash=new PreferencesChoice("实线","虚线","点线","点划线","双点划线");
+        readonly NumericUpDown angle=Number(0,360,0,1);readonly PreferencesSwitch closedPen=new PreferencesSwitch();
         readonly NumericUpDown markerSize=Number(8,200,28,0);
 
         readonly NumericUpDown noteWidth=Number(60,800,320,0);readonly PreferencesSwitch noteAuto=new PreferencesSwitch();
@@ -29,19 +30,23 @@ namespace ScreenCraft
         {
             canvas=c;Dock=DockStyle.Right;Width=280;BackColor=PreferencesLook.Background;Font=new Font("Microsoft YaHei UI",9);fields.BackColor=BackColor;Controls.Add(fields);
             fields.Controls.Add(new Label{Text="标注属性",AutoSize=true,Font=new Font(SystemFonts.MessageBoxFont,FontStyle.Bold)});fields.Controls.Add(target);
-            BeginGroup();Labelled("线宽（px）",width);Labelled("圆角半径（px）",radius);Labelled("线型",dash);Labelled("细线箭头",simpleArrow);Labelled("启用填充",fill);
+            BeginGroup();Labelled("线宽（px）",width);Labelled("圆角半径（px）",radius);Labelled("线型",dash);Labelled("细线箭头",simpleArrow);Labelled("启用填充",fill);Labelled("自动闭合手绘线",closedPen);
             fields.Controls.Add(strokeColor);BeginGroup();Labelled("填充不透明度（%）",alpha);Labelled("字号（px）",font);Labelled("序号号码",number);Labelled("点大小／引线比例",markerSize);
             Labelled("文本宽度（px）",noteWidth);Labelled("随输入扩展",noteAuto);
             BeginGroup();
-            Labelled("位置 X",x);Labelled("位置 Y",y);Labelled("宽度（px）",w);Labelled("高度（px）",h);
+            Labelled("旋转角度（°）",angle);Labelled("位置 X",x);Labelled("位置 Y",y);Labelled("宽度（px）",w);Labelled("高度（px）",h);
             var applyGeometry=new PreferencesButton{Text="应用位置与大小",Width=228};applyGeometry.Click+=delegate{if(canvas.SelectedShape!=null)canvas.ResizeSelected(new RectangleF((float)x.Value,(float)y.Value,(float)w.Value,(float)h.Value));};fields.Controls.Add(applyGeometry);
             note.AccessibleName="文字／气泡说明";var noteField=new PreferencesField(note,228){Height=100};fields.Controls.Add(noteField);
             var applyText=new PreferencesButton{Text="应用文字与序号",Width=228};applyText.Click+=delegate{string desired=note.Text;int n=(int)number.Value;canvas.CommitText();if(canvas.SelectedShape!=null)canvas.EditSelected(delegate(Shape s){s.Text=desired;s.Number=n;});};fields.Controls.Add(applyText);
             var inline=new PreferencesButton{Text="在图上编辑文字",Width=215,Height=32};inline.Click+=delegate{canvas.EditNote();};fields.Controls.Add(inline);
             var remove=new PreferencesButton{Text="删除选中标注",Width=215,Height=32};remove.Click+=delegate{canvas.DeleteSelected();};fields.Controls.Add(remove);
-            var forward=new PreferencesButton{Text="标注上移一层",Width=215,Height=32};forward.Click+=delegate{canvas.ReorderSelected(1);};fields.Controls.Add(forward);
-            var backward=new PreferencesButton{Text="标注下移一层",Width=215,Height=32};backward.Click+=delegate{canvas.ReorderSelected(-1);};fields.Controls.Add(backward);
-            fields.Controls.Add(new Label{Text="在图上点选标注后可拖动、调整控制点；双击文字、序号或云线可编辑说明。",AutoSize=true,MaximumSize=new Size(218,0),Margin=new Padding(0,12,0,12)});
+            var forward=new PreferencesButton{Text="前移一层  Ctrl+]",Width=228,Height=32};forward.Click+=delegate{canvas.ReorderSelected(1);};fields.Controls.Add(forward);
+            var backward=new PreferencesButton{Text="后移一层  Ctrl+[",Width=228,Height=32};backward.Click+=delegate{canvas.ReorderSelected(-1);};fields.Controls.Add(backward);
+            var front=new PreferencesButton{Text="置于顶层  Ctrl+Shift+]",Width=228};front.Click+=delegate{canvas.ReorderSelected(1,true);};fields.Controls.Add(front);
+            var back=new PreferencesButton{Text="置于底层  Ctrl+Shift+[",Width=228};back.Click+=delegate{canvas.ReorderSelected(-1,true);};fields.Controls.Add(back);
+            fields.Controls.Add(new Label{Text="拖动选框上方圆点旋转，Shift 吸附 15°。双击文字、序号或云线可编辑说明。",AutoSize=true,MaximumSize=new Size(218,0),Margin=new Padding(0,12,0,12)});
+            angle.ValueChanged+=delegate{if(!syncing)canvas.SetSelectedRotation((float)angle.Value);};
+            closedPen.CheckedChanged+=delegate{if(!syncing)canvas.SetClosedPen(closedPen.Checked);};
             width.ValueChanged+=delegate{Change(delegate(Shape s){s.Width=(float)width.Value;},delegate{c.DefaultStyle.Width=(float)width.Value;});};
             radius.ValueChanged+=delegate{Change(delegate(Shape s){s.CornerRadius=(float)radius.Value;},delegate{c.DefaultStyle.Radius=(float)radius.Value;});};
             alpha.ValueChanged+=delegate{Change(delegate(Shape s){s.FillColor=Color.FromArgb((int)Math.Round((double)alpha.Value*255/100),s.FillColor);},delegate{c.DefaultStyle.FillColor=Color.FromArgb((int)Math.Round((double)alpha.Value*255/100),c.DefaultStyle.FillColor);});};
@@ -74,7 +79,8 @@ namespace ScreenCraft
                 strokeColor.Swatch=canvas.ActiveColor;strokeColor.Invalidate();
                 bool text=canvas.ActiveKind==Tool.Text||canvas.ActiveHasNote;
                 font.Enabled=text||canvas.ActiveKind==Tool.Watermark;noteWidth.Enabled=noteAuto.Enabled=text;
-                fill.Enabled=alpha.Enabled=canvas.ActiveKind==Tool.Rect||canvas.ActiveKind==Tool.Ellipse||canvas.ActiveKind==Tool.Cloud;
+                fill.Enabled=alpha.Enabled=canvas.ActiveKind==Tool.Rect||canvas.ActiveKind==Tool.Ellipse||canvas.ActiveKind==Tool.Cloud||canvas.ActiveKind==Tool.Pen&&(s==null?d.ClosedPen:s.ClosedPen);
+                angle.Enabled=s!=null&&!canvas.Busy&&!canvas.Typing;Value(angle,(decimal)(s==null?0:s.Rotation));closedPen.Enabled=canvas.ActiveKind==Tool.Pen;closedPen.Checked=s==null?d.ClosedPen:s.ClosedPen;
                 width.Enabled=!text||canvas.ActiveKind==Tool.Cloud;radius.Enabled=canvas.ActiveKind==Tool.Rect;
                 number.Enabled=s!=null&&s.Kind==Tool.Counter;note.Enabled=s!=null&&(s.Kind==Tool.Text||s.Kind==Tool.Watermark||Painter.HasNote(s.Kind));
                 Value(number,s==null?1:s.Number);note.Text=canvas.ActiveText;

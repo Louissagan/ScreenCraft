@@ -34,11 +34,12 @@ namespace ScreenCraft
         }
         public static float CounterRadius(Shape shape) { return MarkerDiameter(shape)*.5f; }
         static RectangleF CircleBounds(PointF center,float diameter) { return new RectangleF(center.X-diameter*.5f,center.Y-diameter*.5f,diameter,diameter); }
-        public static RectangleF Bounds(Shape shape)
+        public static RectangleF LocalBounds(Shape shape)
         {
             RectangleF box;
             switch(shape.Kind){
                 case Tool.Text:return TextBounds(shape);
+                case Tool.Pen:using(var path=FreehandPath(shape)) {box=path.PointCount>0?path.GetBounds():shape.Box;box.Inflate(shape.Width,shape.Width);return box;}
                 case Tool.Callout:box=CircleBounds(shape.A,MarkerDiameter(shape));break;
                 case Tool.Counter:box=CircleBounds(shape.A,MarkerDiameter(shape));if(shape.LeaderCounter)box=RectangleF.Union(box,CounterBadge(shape));break;
                 default:box=shape.Box;float padding=Shape.IsLinear(shape.Kind)?Math.Max(1,shape.Width*3):shape.Kind==Tool.Cloud?CloudAmplitude(shape)+shape.Width:shape.Width*.5f;box.Inflate(padding,padding);break;
@@ -78,6 +79,7 @@ namespace ScreenCraft
         static void Draw(Graphics graphics,Shape shape,Bitmap source,RectangleF area)
         {
             var state=graphics.Save();try{
+                if(shape.Kind==Tool.Pixelate){using(var clip=EffectPath(shape))graphics.SetClip(clip,CombineMode.Intersect);}else ApplyRotation(graphics,shape);
                 graphics.SmoothingMode=SmoothingMode.AntiAlias;graphics.TextRenderingHint=TextRenderingHint.AntiAliasGridFit;
                 if(DrawExtended(graphics,shape,source,area))return;
                 switch(shape.Kind){
@@ -87,7 +89,7 @@ namespace ScreenCraft
                     case Tool.Highlight:using(var brush=new SolidBrush(Color.FromArgb(95,shape.Color)))graphics.FillRectangle(brush,shape.Box);break;
                     case Tool.Redact:graphics.SmoothingMode=SmoothingMode.None;using(var brush=new SolidBrush(Color.FromArgb(22,22,26)))graphics.FillRectangle(brush,Rectangle.Round(shape.Box));break;
                     case Tool.Pixelate:
-                        var region=Rectangle.Intersect(Rectangle.Round(shape.Box),Rectangle.Intersect(Rectangle.Round(area),new Rectangle(Point.Empty,source.Size)));
+                        var region=Rectangle.Intersect(Rectangle.Ceiling(EffectBounds(shape)),Rectangle.Intersect(Rectangle.Round(area),new Rectangle(Point.Empty,source.Size)));
                         if(region.Width<1||region.Height<1)break;
                         int block=shape.MosaicBlock>0?shape.MosaicBlock:Math.Max(12,Math.Min(source.Width,source.Height)/45);
                         if(shape.Cache==null||shape.CacheBox!=region||shape.CacheBlock!=block||shape.CachedRedactionMode!=0){shape.DropCache();shape.Cache=Pixelate(source,region,block);shape.CacheBox=region;shape.CacheBlock=block;shape.CachedRedactionMode=0;}
@@ -101,7 +103,7 @@ namespace ScreenCraft
             for(int index=0;index<=shapes.Count;index++){
                 Shape shape=index==shapes.Count?extra:shapes[index];if(shape==null||shape==skip)continue;
                 Draw(graphics,shape,source,area);
-                if(shape.Kind==Tool.Pixelate){var state=graphics.Save();try{graphics.SetClip(shape.Box,CombineMode.Intersect);DrawSpotlights(graphics,shapes,extra,area);}finally{graphics.Restore(state);}}
+                if(shape.Kind==Tool.Pixelate){var state=graphics.Save();try{using(var clip=EffectPath(shape))graphics.SetClip(clip,CombineMode.Intersect);DrawSpotlights(graphics,shapes,extra,area);}finally{graphics.Restore(state);}}
             }
         }
         public static void DrawSpotlights(Graphics graphics,IList<Shape> shapes,Shape extra,RectangleF area)
@@ -116,9 +118,10 @@ namespace ScreenCraft
                 // Analytic pixel coverage of the union of rounded apertures. Taking
                 // minimum coverage avoids the dark seam of overlapping cutout paths.
                 foreach(var shape in holes){var box=shape.Box;if(box.Width<1||box.Height<1)continue;float radius=Math.Min(6+shape.Width*2,Math.Min(box.Width,box.Height)/2),cx=box.Left+box.Width/2,cy=box.Top+box.Height/2;
-                    var affected=Rectangle.Intersect(visible,Rectangle.Ceiling(RectangleF.Inflate(box,1,1)));
+                    var pivot=RotationCenter(shape);double radians=-shape.Rotation*Math.PI/180,cos=Math.Cos(radians),sin=Math.Sin(radians);
+                    var affected=Rectangle.Intersect(visible,Rectangle.Ceiling(RectangleF.Inflate(EffectBounds(shape),1,1)));
                     for(int y=affected.Top;y<affected.Bottom;y++)for(int x=affected.Left;x<affected.Right;x++){
-                        double qx=Math.Abs(x+.5-cx)-(box.Width/2-radius),qy=Math.Abs(y+.5-cy)-(box.Height/2-radius),ex=Math.Max(0,qx),ey=Math.Max(0,qy);
+                        double dx=x+.5-pivot.X,dy=y+.5-pivot.Y,localX=pivot.X+dx*cos-dy*sin,localY=pivot.Y+dx*sin+dy*cos;double qx=Math.Abs(localX-cx)-(box.Width/2-radius),qy=Math.Abs(localY-cy)-(box.Height/2-radius),ex=Math.Max(0,qx),ey=Math.Max(0,qy);
                         double distance=Math.Sqrt(ex*ex+ey*ey)+Math.Min(Math.Max(qx,qy),0)-radius;
                         int coverage=(int)Math.Round(alpha*Math.Max(0,Math.Min(1,distance+.5)));int index=(y-visible.Top)*visible.Width+x-visible.Left;
                         if(coverage<(int)((uint)pixels[index]>>24))pixels[index]=unchecked(coverage<<24);

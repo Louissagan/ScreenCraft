@@ -8,7 +8,7 @@ namespace ScreenCraft
     {
         internal static void DrawSoftRedaction(Graphics g,Shape s,Bitmap source,RectangleF captureArea)
         {
-            var area=Rectangle.Intersect(Rectangle.Round(s.Box),Rectangle.Intersect(new Rectangle(Point.Empty,source.Size),Rectangle.Round(captureArea)));if(area.Width<1||area.Height<1)return;int block=s.MosaicBlock>0?s.MosaicBlock:16;
+            var area=Rectangle.Intersect(Rectangle.Ceiling(EffectBounds(s)),Rectangle.Intersect(new Rectangle(Point.Empty,source.Size),Rectangle.Round(captureArea)));if(area.Width<1||area.Height<1)return;int block=s.MosaicBlock>0?s.MosaicBlock:16;
             if(s.Cache==null||s.CacheBox!=area||s.CacheBlock!=block||s.CachedRedactionMode!=s.RedactionMode){s.DropCache();if(s.RedactionMode==1)using(var cropped=source.Clone(area,PixelFormat.Format32bppArgb))s.Cache=FrozenGlass.Blur(cropped,false,Math.Max(3,block/3));else{s.Cache=new Bitmap(area.Width,area.Height);using(var paint=Graphics.FromImage(s.Cache)){paint.Clear(Color.White);paint.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;int step=Math.Max(6,block/2);Color[] colors={Color.FromArgb(0,105,239),Color.FromArgb(90,165,255),Color.FromArgb(255,150,40),Color.FromArgb(170,205,250)};for(int y=step/2;y<area.Height;y+=step)for(int x=step/2;x<area.Width;x+=step)using(var brush=new SolidBrush(colors[((x/step)*7+(y/step)*3)%colors.Length]))paint.FillEllipse(brush,x-step/6f,y-step/6f,step/3f,step/3f);}}s.CacheBox=area;s.CacheBlock=block;s.CachedRedactionMode=s.RedactionMode;}
             g.DrawImage(s.Cache,area);
         }

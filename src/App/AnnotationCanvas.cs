@@ -9,7 +9,7 @@ namespace ScreenCraft
         public float Width=3, FontPx=22, Radius,MarkerSize=28,EffectOpacity=68;
         public bool FillEnabled, SimpleArrow;
         public bool NoteAutoWidth=true,TextWrap=true,LeaderCounter;public float NoteWidth=320;
-        public bool SmoothPen=true,FreehandArrow,ArrowWhiteOutline;
+        public bool SmoothPen=true,FreehandArrow,ArrowWhiteOutline,ClosedPen;
         public int RedactionMode;
         public Color FillColor=Color.FromArgb(60,255,210,0);
         public DashStyle Dash;
@@ -39,13 +39,13 @@ namespace ScreenCraft
             s.MarkerSize=DefaultStyle.MarkerSize;s.EffectOpacity=DefaultStyle.EffectOpacity;
             if(s.Kind==Tool.Text){s.FillEnabled=true;s.FillColor=System.Drawing.Color.FromArgb(255,s.Color);s.CornerRadius=6;}
             s.SimpleArrow=DefaultStyle.SimpleArrow;s.NoteWidth=DefaultStyle.NoteWidth;s.NoteAutoWidth=DefaultStyle.NoteAutoWidth;s.TextWrap=DefaultStyle.TextWrap;s.LeaderCounter=DefaultStyle.LeaderCounter;
-            s.SmoothPen=DefaultStyle.SmoothPen;s.FreehandArrow=DefaultStyle.FreehandArrow;s.ArrowWhiteOutline=DefaultStyle.ArrowWhiteOutline;
+            s.ClosedPen=DefaultStyle.ClosedPen;s.SmoothPen=DefaultStyle.SmoothPen;s.FreehandArrow=DefaultStyle.FreehandArrow;s.ArrowWhiteOutline=DefaultStyle.ArrowWhiteOutline;
             s.RedactionMode=DefaultStyle.RedactionMode;
             s.HasNoteTextColor=DefaultStyle.HasNoteTextColor;s.NoteTextColor=DefaultStyle.NoteTextColor;s.NoteFontPx=DefaultStyle.NoteFontPx;
             if(s.Kind==Tool.Pixelate)s.MosaicBlock=DefaultStyle.MosaicBlock;
         }
 
-        internal static bool UsesOutlineFill(Tool kind){return kind==Tool.Rect||kind==Tool.Ellipse||kind==Tool.Cloud||kind==Tool.Callout;}
+        internal static bool UsesOutlineFill(Tool kind){return kind==Tool.Rect||kind==Tool.Ellipse||kind==Tool.Cloud||kind==Tool.Callout||kind==Tool.Pen;}
         public void SetShapeFill(bool enabled)
         {
             if(selected!=null)EditSelected(delegate(Shape s){s.FillEnabled=enabled;if(UsesOutlineFill(s.Kind))s.FillColor=System.Drawing.Color.FromArgb(s.FillColor.A,s.Color);
@@ -97,12 +97,16 @@ namespace ScreenCraft
                 if(s.Curved)s.C=Painter.Similar(s.C,oldA,oldB,s.A,s.B);
             });
         }
-        public void ReorderSelected(int direction)
+        public void ReorderSelected(int direction){ReorderSelected(direction,false);}
+        public void ReorderSelected(int direction,bool toEdge)
         {
-            if(selected==null||direction==0)return;var items=new HashSet<Shape>(SelectedShapes);Commit();
-            if(direction>0){for(int i=shapes.Count-2;i>=0;i--)if(items.Contains(shapes[i])&&!items.Contains(shapes[i+1])){var s=shapes[i];shapes[i]=shapes[i+1];shapes[i+1]=s;}}
-            else{for(int i=1;i<shapes.Count;i++)if(items.Contains(shapes[i])&&!items.Contains(shapes[i-1])){var s=shapes[i];shapes[i]=shapes[i-1];shapes[i-1]=s;}}
-            Fire(Changed);Fire(StateChanged);Invalidate();
+            if(selected==null||direction==0||Busy||Typing)return;
+            var items=new HashSet<Shape>(SelectedShapes);var next=new List<Shape>(shapes);
+            if(toEdge){next.Clear();next.AddRange(shapes.FindAll(s=>items.Contains(s)==(direction<0)));next.AddRange(shapes.FindAll(s=>items.Contains(s)!=(direction<0)));}
+            else if(direction>0){for(int i=next.Count-2;i>=0;i--)if(items.Contains(next[i])&&!items.Contains(next[i+1])){var item=next[i];next[i]=next[i+1];next[i+1]=item;}}
+            else{for(int i=1;i<next.Count;i++)if(items.Contains(next[i])&&!items.Contains(next[i-1])){var item=next[i];next[i]=next[i-1];next[i-1]=item;}}
+            bool changed=false;for(int i=0;i<shapes.Count;i++)if(shapes[i]!=next[i]){changed=true;break;}if(!changed)return;
+            Commit();shapes=next;NotifyEdit();
         }
 
         public AnnotationDocument ExportDocument()

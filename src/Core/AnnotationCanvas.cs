@@ -13,7 +13,7 @@ namespace ScreenCraft
     public partial class Canvas : Control
     {
         sealed class Snapshot { internal List<Shape> Shapes;internal RectangleF Crop;internal Settings Background;internal bool BackgroundOn;internal float OutputCornerRadius;internal object Extra; }
-        enum Drag { None,Draw,Move,Resize }
+        enum Drag { None,Draw,Move,Resize,Rotate }
         public Func<object> SaveExtra;public Action<object> LoadExtra;
         public static readonly float[] Weights={.6f,1,1.6f};
         public static bool PaintUnderCard;
@@ -131,16 +131,16 @@ namespace ScreenCraft
             if(Painter.HasNote(shape.Kind)&&movingNote&&!string.IsNullOrEmpty(shape.Text))return Painter.NoteBounds(shape);
             if(shape.Kind==Tool.Text)return Painter.TextBounds(shape);
             if(shape.Kind==Tool.Counter)return shape.LeaderCounter?Painter.CounterBadge(shape):new RectangleF(shape.A.X-Painter.CounterRadius(shape),shape.A.Y-Painter.CounterRadius(shape),Painter.CounterRadius(shape)*2,Painter.CounterRadius(shape)*2);
-            return shape.Kind==Tool.Callout?Painter.Bounds(shape):shape.Box;
+            return shape.Kind==Tool.Callout?Painter.LocalBounds(shape):shape.Box;
         }
         PointF[] Handles(Shape shape){return SelectionCount<=1&&Shape.IsLinear(shape.Kind)?new[]{shape.A,shape.B,shape.Mid}:BoxHandles(HandleBounds(shape));}
-        Point[] ScreenHandles(Shape shape){return Handles(shape).Select(ToScreen).ToArray();}
+        Point[] ScreenHandles(Shape shape){return Handles(shape).Select(p=>ToScreen(SelectionCount>1?p:Painter.WorldPoint(shape,p))).ToArray();}
         int HandleAt(Point point){if(selected==null||Typing)return -1;var handles=ScreenHandles(selected);for(int i=0;i<handles.Length;i++)if(Math.Abs(handles[i].X-point.X)<=Pu(6)&&Math.Abs(handles[i].Y-point.Y)<=Pu(6))return i;return -1;}
         void Outline(Graphics g,Shape shape,bool strong)
         {
             Color accent=strong?CaptureLook.Blue:System.Drawing.Color.FromArgb(120,CaptureLook.Blue);
-            using(var pen=new Pen(accent,1)){pen.DashStyle=DashStyle.Dash;var bounds=ScreenRect(HandleBounds(shape));if(!Shape.IsLinear(shape.Kind)||SelectionCount>1)g.DrawRectangle(pen,bounds);}
-            if(strong)foreach(var point in ScreenHandles(shape))SelectionAppearance.PaintHandle(g,new Rectangle(point.X-Pu(3),point.Y-Pu(3),Pu(6),Pu(6)));
+            using(var pen=new Pen(accent,1)){pen.DashStyle=DashStyle.Dash;if(!Shape.IsLinear(shape.Kind)||SelectionCount>1)g.DrawPolygon(pen,AdornmentCorners(shape).Select(ToScreen).ToArray());}
+            if(strong){foreach(var point in ScreenHandles(shape))SelectionAppearance.PaintHandle(g,new Rectangle(point.X-Pu(3),point.Y-Pu(3),Pu(6),Pu(6)));PaintRotationControl(g,shape);}
         }
         static float SegmentDistance(PointF point,PointF start,PointF end)
         {
@@ -149,17 +149,19 @@ namespace ScreenCraft
         }
         bool Hit(Shape shape,PointF point,float tolerance)
         {
+            point=Painter.LocalPoint(shape,point);
             if(Painter.HasNote(shape.Kind)&&!string.IsNullOrEmpty(shape.Text)&&LeaderHit(point,shape.A,Painter.NoteBounds(shape),tolerance))return true;
             if(shape.Kind==Tool.Text)return Painter.TextBounds(shape).Contains(point);
-            if(shape.Kind==Tool.Counter||shape.Kind==Tool.Callout)return Painter.Bounds(shape).Contains(point);
-            if(Shape.IsLinear(shape.Kind)||shape.Kind==Tool.Pen){var points=shape.Kind==Tool.Pen?(shape.Points??new List<PointF>()).ToArray():shape.Curve(shape.Curved?48:1);for(int i=1;i<points.Length;i++)if(SegmentDistance(point,points[i-1],points[i])<=tolerance+shape.Width)return true;return false;}
+            if(shape.Kind==Tool.Counter||shape.Kind==Tool.Callout)return Painter.LocalBounds(shape).Contains(point);
+            if(shape.Kind==Tool.Pen){using(var path=Painter.FreehandPath(shape))using(var pen=new Pen(System.Drawing.Color.Black,Math.Max(1,2*tolerance+shape.Width))){return path.PointCount==0?SegmentDistance(point,shape.A,shape.A)<=tolerance+shape.Width:path.IsOutlineVisible(point,pen)||(shape.ClosedPen&&shape.FillEnabled&&path.IsVisible(point));}}
+            if(Shape.IsLinear(shape.Kind)){var points=shape.Kind==Tool.Pen?(shape.Points??new List<PointF>()).ToArray():shape.Curve(shape.Curved?48:1);for(int i=1;i<points.Length;i++)if(SegmentDistance(point,points[i-1],points[i])<=tolerance+shape.Width)return true;return false;}
             var b=shape.Box;b.Inflate(tolerance,tolerance);if(!b.Contains(point))return false;
             if(shape.FillEnabled||shape.Kind==Tool.Highlight||shape.Kind==Tool.Redact||shape.Kind==Tool.Pixelate||shape.Kind==Tool.Watermark)return true;
             if(shape.Kind==Tool.Ellipse){double rx=shape.Box.Width/2,ry=shape.Box.Height/2;if(rx<.01||ry<.01)return false;double d=Math.Sqrt(Math.Pow((point.X-shape.Box.Left-rx)/rx,2)+Math.Pow((point.Y-shape.Box.Top-ry)/ry,2));return Math.Abs(d-1)<=tolerance/Math.Min(rx,ry);}
             b=shape.Box;b.Inflate(-tolerance,-tolerance);return !b.Contains(point);
         }
         Shape ShapeAt(Point point){var p=ToImg(point,false);for(int i=shapes.Count-1;i>=0;i--)if(Hit(shapes[i],p,Pu(5)/k))return shapes[i];return null;}
-        void UpdateHover(Point point){var next=ShapeAt(point);if(next!=hover){hover=next;Invalidate();}Cursor=HandleAt(point)>=0?Cursors.SizeNWSE:next!=null?Cursors.SizeAll:Tool==Tool.Text?Cursors.IBeam:Cursors.Cross;}
+        void UpdateHover(Point point){var next=ShapeAt(point);if(next!=hover){hover=next;Invalidate();}Cursor=RotationAt(point)?Cursors.Hand:HandleAt(point)>=0?Cursors.SizeNWSE:next!=null?Cursors.SizeAll:Tool==Tool.Text?Cursors.IBeam:Cursors.Cross;}
 
         void BeginEditGesture(PointF point)
         {
@@ -171,13 +173,13 @@ namespace ScreenCraft
             if(e.Button==MouseButtons.Left&&TrySampleColor(e.Location))return;if(Busy)return;Fit();
             if(!InPlaceViewport&&(e.Button==MouseButtons.Middle||e.Button==MouseButtons.Left&&spacePan)){panning=true;panFrom=e.Location;panStart=pan;panButton=e.Button;Capture=true;return;}
             if(Typing){CommitText();return;}if(e.Button==MouseButtons.Right){SelectShape(null);return;}if(e.Button!=MouseButtons.Left)return;Focus();
-            var point=ToImg(e.Location,true);int index=HandleAt(e.Location);
-            if(index>=0){handle=index;var target=Handles(selected)[index];var raw=ToImg(e.Location,false);grab=new PointF(target.X-raw.X,target.Y-raw.Y);drag=Drag.Resize;BeginEditGesture(raw);return;}
+            var point=ToImg(e.Location,true);if(RotationAt(e.Location)){drag=Drag.Rotate;BeginEditGesture(ToImg(e.Location,false));rotationPivot=SelectionCount>1?Painter.Center(gestureBounds):Painter.RotationCenter(orig);rotationStart=PointerAngle(dragFrom,rotationPivot);return;}int index=HandleAt(e.Location);
+            if(index>=0){handle=index;var target=SelectionCount>1?Handles(selected)[index]:Painter.WorldPoint(selected,Handles(selected)[index]);var raw=ToImg(e.Location,false);grab=new PointF(target.X-raw.X,target.Y-raw.Y);drag=Drag.Resize;BeginEditGesture(raw);return;}
             Shape hit=Tool==Tool.Crop?null:ShapeAt(e.Location);
             if(hit!=null){if((InputModifiers&(Keys.Control|Keys.Shift))!=0){ToggleSelection(hit);return;}if(!SelectedShapes.Contains(hit))SelectShape(hit);
                 if(e.Clicks>1&&(hit.Kind==Tool.Text||Painter.HasNote(hit.Kind)||hit.Kind==Tool.Watermark)){StartText(hit.A,hit);return;}
-                movingNote=Painter.HasNote(hit.Kind)&&!string.IsNullOrEmpty(hit.Text)&&Painter.NoteBounds(hit).Contains(point);
-                movingCounterBadge=hit.Kind==Tool.Counter&&hit.LeaderCounter&&!movingNote&&Painter.CounterBadge(hit).Contains(point);
+                movingNote=Painter.HasNote(hit.Kind)&&!string.IsNullOrEmpty(hit.Text)&&Painter.NoteBounds(hit).Contains(Painter.LocalPoint(hit,point));
+                movingCounterBadge=hit.Kind==Tool.Counter&&hit.LeaderCounter&&!movingNote&&Painter.CounterBadge(hit).Contains(Painter.LocalPoint(hit,point));
                 drag=Drag.Move;BeginEditGesture(ToImg(e.Location,false));return;
             }
             if((InputModifiers&Keys.Control)!=0)return;SelectShape(null);if(!ScreenRect(Crop).Contains(e.Location))return;
@@ -195,15 +197,17 @@ namespace ScreenCraft
         {
             var point=ToImg(pixel,drag==Drag.Draw);bool square=(InputModifiers&Keys.Shift)!=0;
             if(drag==Drag.Draw){cur.B=square?Constrained(cur.A,point,cur.Kind):point;if(cur.Points!=null){if(square){cur.B=Math.Abs(point.X-cur.A.X)>=Math.Abs(point.Y-cur.A.Y)?new PointF(point.X,cur.A.Y):new PointF(cur.A.X,point.Y);cur.Points=new List<PointF>{cur.A,cur.B};}else if(cur.Points.Count==0||cur.Points[cur.Points.Count-1]!=point)cur.Points.Add(point);}Invalidate();return;}
-            if(drag!=Drag.Move&&drag!=Drag.Resize)return;
-            if(Math.Abs(point.X-dragFrom.X)+Math.Abs(point.Y-dragFrom.Y)<.001)return;
+            if(drag!=Drag.Move&&drag!=Drag.Resize&&drag!=Drag.Rotate)return;
+            if(!gestureCommitted&&Math.Abs(point.X-dragFrom.X)+Math.Abs(point.Y-dragFrom.Y)<.001)return;
             if(!gestureCommitted){undo.Add(gestureBefore);redo.Clear();version++;gestureCommitted=true;}
-            if(drag==Drag.Move){if(SelectionCount>1)MoveSelection(point.X-dragFrom.X,point.Y-dragFrom.Y);else MoveAnnotation(point.X-dragFrom.X,point.Y-dragFrom.Y);}
-            else{point=new PointF(point.X+grab.X,point.Y+grab.Y);
+            if(drag==Drag.Rotate)RotateGesture(point,square);
+            else if(drag==Drag.Move){if(SelectionCount>1)MoveSelection(point.X-dragFrom.X,point.Y-dragFrom.Y);else{selected.Offset(orig,0,0);selected.NoteOffset=orig.NoteOffset;MoveAnnotation(point.X-dragFrom.X,point.Y-dragFrom.Y);}}
+            else{point=new PointF(point.X+grab.X,point.Y+grab.Y);if(SelectionCount==1){point=Painter.LocalPoint(orig,point);selected.Offset(orig,0,0);selected.NoteOffset=orig.NoteOffset;}
                 if(SelectionCount>1)ResizeSelection(point,square);
                 else if((movingNote&&Painter.HasNote(selected.Kind))||selected.Kind==Tool.Text)ResizeNote(selected,orig,handle,point);
                 else if(Shape.IsLinear(selected.Kind)){if(handle==0)selected.A=point;else if(handle==1)selected.B=point;else selected.SetMid(point,Pu(4)/k);}
                 else{var target=ResizeBounds(HandleBounds(orig),handle,point,square);if(selected.Kind==Tool.Counter){if(selected.LeaderCounter)selected.B=new PointF(target.Left+target.Width/2,target.Top+target.Height/2);else selected.A=selected.B=new PointF(target.Left+target.Width/2,target.Top+target.Height/2);selected.MarkerSize=target.Width;}else TransformShape(selected,orig,orig.Box,target);}
+                if(SelectionCount==1)PreserveRotationFrame(selected,orig);
             }
             foreach(var shape in SelectedShapes)shape.DropCache();NotifyEdit();
         }
@@ -232,12 +236,13 @@ namespace ScreenCraft
         {
             base.OnKeyDown(e);if(Typing)return;
             if(e.KeyCode==Keys.Escape){if(Busy)CancelGesture();else SelectShape(null);e.Handled=true;return;}
-            if(e.KeyCode==Keys.ShiftKey&&(drag==Drag.Draw||drag==Drag.Resize))UpdateGesture(lastPointer);
+            if(e.KeyCode==Keys.ShiftKey&&(drag==Drag.Draw||drag==Drag.Resize||drag==Drag.Rotate))UpdateGesture(lastPointer);
             if(Busy)return;
+            if(ApplyArrangeKey(e.KeyData)){e.Handled=true;return;}
             if(e.KeyCode==Keys.Space){spacePan=true;return;}if(e.Control){switch(e.KeyCode){case Keys.A:SelectAll();break;case Keys.D:DuplicateSelected();break;case Keys.Z:Undo();break;case Keys.Y:Redo();break;default:return;}e.Handled=true;return;}
             if(e.KeyCode==Keys.Delete){DeleteSelected();e.Handled=true;return;}int step=e.Shift?10:1;switch(e.KeyCode){case Keys.Left:Nudge(-step,0);break;case Keys.Right:Nudge(step,0);break;case Keys.Up:Nudge(0,-step);break;case Keys.Down:Nudge(0,step);break;default:return;}e.Handled=true;
         }
-        protected override void OnKeyUp(KeyEventArgs e){if(e.KeyCode==Keys.Space)spacePan=false;if(e.KeyCode==Keys.ShiftKey&&(drag==Drag.Draw||drag==Drag.Resize))UpdateGesture(lastPointer);base.OnKeyUp(e);}
+        protected override void OnKeyUp(KeyEventArgs e){if(e.KeyCode==Keys.Space)spacePan=false;if(e.KeyCode==Keys.ShiftKey&&(drag==Drag.Draw||drag==Drag.Resize||drag==Drag.Rotate))UpdateGesture(lastPointer);base.OnKeyUp(e);}
         protected override void OnLostFocus(EventArgs e){spacePan=false;base.OnLostFocus(e);}
 
         Snapshot Take(){return new Snapshot{Shapes=shapes.Select(s=>s.Clone()).ToList(),Crop=Crop,Background=Bg==null?null:Bg.Clone(),BackgroundOn=BgOn,OutputCornerRadius=OutputCornerRadius,Extra=SaveExtra==null?null:SaveExtra()};}
@@ -280,12 +285,13 @@ namespace ScreenCraft
         {
             if(box==null)return;Fit();float fontSize=Math.Max(9,InputSize*k);if(inputFont==null||Math.Abs(inputFont.Size-fontSize)>.01){var prior=inputFont;inputFont=new Font("Microsoft YaHei UI",fontSize,GraphicsUnit.Pixel);box.Font=inputFont;if(prior!=null)prior.Dispose();}
             var live=LiveInput();bool note=Painter.HasNote(live.Kind);var bounds=InputBounds();box.WordWrap=note||live.TextWrap;box.ForeColor=System.Drawing.Color.White;box.BackColor=editing==null?Color:Painter.LabelColor(editing);
+            if(editing!=null&&editing.Rotation!=0){var location=Painter.WorldPoint(editing,bounds.Location);bounds.Location=location;}
             var at=ToScreen(new PointF(bounds.Left+8,bounds.Top+8));int width=Math.Max(24,(int)Math.Round((bounds.Width-16)*k));
             var size=TextRenderer.MeasureText((box.Text.Length==0?" ":box.Text)+(box.Text.EndsWith("\n")?" ":""),box.Font,new Size(box.WordWrap?width:32767,32767),TextFormatFlags.NoPadding|TextFormatFlags.TextBoxControl|(box.WordWrap?TextFormatFlags.WordBreak:0));
             box.Bounds=new Rectangle(at,new Size(box.WordWrap?width:Math.Max(24,size.Width+4),Math.Max(box.Font.Height,size.Height)));lastInputBounds=ScreenRect(bounds);
         }
         bool BoxStale(){return false;}
-        void BoxLabel(Graphics graphics){if(box==null)return;var bounds=ScreenRect(InputBounds());using(var path=Theme.Round(bounds,6*k))using(var brush=new SolidBrush(box.BackColor))graphics.FillPath(brush,path);}
+        void BoxLabel(Graphics graphics){if(box==null)return;var local=InputBounds();if(editing!=null&&editing.Rotation!=0)local.Location=Painter.WorldPoint(editing,local.Location);var bounds=ScreenRect(local);using(var path=Theme.Round(bounds,6*k))using(var brush=new SolidBrush(box.BackColor))graphics.FillPath(brush,path);}
         void DropBox(TextBox input){Controls.Remove(input);input.Dispose();if(inputFont!=null){inputFont.Dispose();inputFont=null;}lastInputBounds=Rectangle.Empty;}
         public void CommitText()
         {
