@@ -36,7 +36,7 @@ namespace ScreenCraft
                             stroke.AddLine(17.5f,20,21.3f,16.7f);
                             g.DrawPath(p,stroke);
                         }break;
-                    case "pen-closed":g.DrawClosedCurve(p,new[]{new PointF(4,16),new PointF(7,5),new PointF(17,6),new PointF(21,16),new PointF(13,20)},.45f,FillMode.Alternate);break;
+                    case "pen-closed":var vertices=new[]{new PointF(4,17),new PointF(8,4),new PointF(20,8),new PointF(17,20)};g.DrawPolygon(p,vertices);foreach(var vertex in vertices)g.FillRectangle(brush,vertex.X-1.5f,vertex.Y-1.5f,3,3);break;
                     case "pen-smooth":g.DrawBezier(p,new PointF(3,18),new PointF(20,0),new PointF(4,3),new PointF(21,18));break;
                     case "pen-arrow":g.DrawBezier(p,new PointF(3,4),new PointF(20,2),new PointF(0,14),new PointF(20,20));g.DrawLines(p,new[]{new PointF(14,12),new PointF(20,20),new PointF(10,21)});break;
                     case "arrow-outline":using(var shape=Painter.ArrowPath(new PointF(4,20),new PointF(20,4),3.5f))using(var edge=new Pen(color,2))g.DrawPath(edge,shape);break;

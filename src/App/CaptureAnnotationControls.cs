@@ -37,11 +37,12 @@ namespace ScreenCraft
             OptionVisible(transparentText,false);OptionVisible(solidText,false);OptionVisible(circleNumber,false);OptionVisible(leaderNumber,false);
             int radius=(int)(crop?canvas.OutputCornerRadius:s==null?d.Radius:s.CornerRadius);radiusSlider.Maximum=Math.Max(200,radius);radiusSlider.Value=radius;radiusLabel.Text="圆角 "+radius;OptionVisible(radiusSlider,crop||kind==Tool.Rect);OptionVisible(radiusLabel,crop||kind==Tool.Rect);
             OptionVisible(square,kind==Tool.Rect);OptionVisible(round,kind==Tool.Rect);
+            bool polygon=kind==Tool.Pen&&(s==null?d.ClosedPen:s.ClosedPen);if(polygon)propertyTitle.Text="多边形";
             bool geometry=kind==Tool.Rect||kind==Tool.Ellipse||kind==Tool.Cloud||kind==Tool.Pen&&(s==null?d.ClosedPen:s.ClosedPen);OptionVisible(emptyFill,geometry);OptionVisible(filled,geometry);emptyFill.Selected=!(s==null?d.FillEnabled:s.FillEnabled);filled.Selected=!emptyFill.Selected;
             OptionVisible(solid,!text&&!mosaic&&!crop&&!watermark&&!spotlight&&kind!=Tool.Redact);OptionVisible(dash,!text&&!mosaic&&!crop&&!watermark&&!spotlight&&kind!=Tool.Redact);solid.Selected=(s==null?d.Dash:s.Dash)==System.Drawing.Drawing2D.DashStyle.Solid;dash.Selected=!solid.Selected;
             OptionVisible(arrowThin,kind==Tool.Arrow);OptionVisible(arrowBold,kind==Tool.Arrow);OptionVisible(outlineArrow,kind==Tool.Arrow);arrowThin.Selected=s==null?d.SimpleArrow:s.SimpleArrow;outlineArrow.Selected=s==null?d.ArrowWhiteOutline:s.ArrowWhiteOutline;arrowBold.Selected=!arrowThin.Selected&&!outlineArrow.Selected;
             OptionVisible(closedPen,kind==Tool.Pen);closedPen.Selected=s==null?d.ClosedPen:s.ClosedPen;OptionVisible(rotateSelection,canvas.HasSelection);
-            OptionVisible(rawPen,kind==Tool.Pen);OptionVisible(smoothPen,kind==Tool.Pen);OptionVisible(freeArrow,kind==Tool.Pen);smoothPen.Selected=s==null?d.SmoothPen:s.SmoothPen;rawPen.Selected=!smoothPen.Selected;freeArrow.Selected=s==null?d.FreehandArrow:s.FreehandArrow;
+            OptionVisible(finishPolygon,canvas.DrawingPolygon);OptionVisible(rawPen,kind==Tool.Pen&&!polygon);OptionVisible(smoothPen,kind==Tool.Pen&&!polygon);OptionVisible(freeArrow,kind==Tool.Pen&&!polygon);smoothPen.Selected=s==null?d.SmoothPen:s.SmoothPen;rawPen.Selected=!smoothPen.Selected;freeArrow.Selected=s==null?d.FreehandArrow:s.FreehandArrow;
             OptionVisible(mosaicBlocks,mosaic);OptionVisible(mosaicBlur,mosaic);OptionVisible(mosaicDots,mosaic);int mode=s==null?d.RedactionMode:s.RedactionMode;mosaicBlocks.Selected=mode==0;mosaicBlur.Selected=mode==1;mosaicDots.Selected=mode==2;
             OptionVisible(watermarkProperties,watermark);optionsShown=kind!=Tool.Redact||canvas.HasSelection;
         }

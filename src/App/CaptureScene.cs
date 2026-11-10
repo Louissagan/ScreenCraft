@@ -33,7 +33,7 @@ namespace ScreenCraft
         bool PaintFrozenSurface(System.Windows.Forms.PaintEventArgs e)
         {
             if(!FullCaptureSurface)return false;Fit();var g=e.Graphics;PaintCaptureBackdrop(g);var state=g.Save();using(var path=Theme.Round(Crop,Math.Min(OutputCornerRadius,Math.Min(Crop.Width,Crop.Height)/2)))g.SetClip(path,CombineMode.Intersect);Painter.DrawMarks(g,shapes,cur!=null&&cur.Kind!=Tool.Crop?cur:null,editing,Img,Crop);PaintEditingAnchor(g);g.Restore(state);
-            if(box!=null){if(BoxStale())PlaceBox();BoxLabel(g);}if(hover!=null&&hover!=selected&&drag==Drag.None&&box==null)Outline(g,hover,false);if(selected!=null&&box==null){if(SelectionCount>1)OutlineGroup(g);else Outline(g,selected,true);}if(PaintCaptureChrome!=null)PaintCaptureChrome(g);return true;
+            PaintPolygonAnchors(g);if(box!=null){if(BoxStale())PlaceBox();BoxLabel(g);}if(hover!=null&&hover!=selected&&drag==Drag.None&&box==null)Outline(g,hover,false);if(selected!=null&&box==null){if(SelectionCount>1)OutlineGroup(g);else Outline(g,selected,true);}if(PaintCaptureChrome!=null)PaintCaptureChrome(g);return true;
         }
         internal void PaintCaptureBackdrop(Graphics g)
         {

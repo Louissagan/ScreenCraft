@@ -57,9 +57,9 @@ namespace ScreenCraft
         }
         public bool Typing{get{return box!=null;}}
         public bool HasSelection{get{return selected!=null;}}
-        public bool Busy{get{return drag!=Drag.None||panning||sampledColor!=null;}}
-        public bool CanUndo{get{return undo.Count!=0||Typing;}}
-        public bool CanRedo{get{return redo.Count!=0&&!Typing;}}
+        public bool Busy{get{return polygonDrawing||drag!=Drag.None||panning||sampledColor!=null;}}
+        public bool CanUndo{get{return polygonDrawing||undo.Count!=0||Typing;}}
+        public bool CanRedo{get{return polygonDrawing?polygonRedo.Count!=0:redo.Count!=0&&!Typing;}}
         public bool IsCropped{get{return Crop!=new RectangleF(PointF.Empty,Img.Size);}}
         public bool HasMarks{get{return shapes.Count!=0;}}
         public Color ActiveColor{get{return selected==null?Color:selected.Kind==Tool.Text?Painter.LabelColor(selected):selected.Color;}}
@@ -120,6 +120,7 @@ namespace ScreenCraft
         }
         void PaintAdornments(Graphics g)
         {
+            PaintPolygonAnchors(g);
             if(cur!=null&&cur.Kind==Tool.Crop){using(var pen=new Pen(CaptureLook.Blue,1))g.DrawRectangle(pen,ScreenRect(cur.Box));}
             if(hover!=null&&hover!=selected&&!Busy)Outline(g,hover,false);
             if(selected!=null&&!Typing){if(SelectionCount>1)OutlineGroup(g);else Outline(g,selected,true);}
@@ -169,7 +170,7 @@ namespace ScreenCraft
         }
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            base.OnMouseDown(e);lastPointer=e.Location;if(FullCaptureSurface&&CaptureDown!=null&&CaptureDown(e))return;
+            base.OnMouseDown(e);lastPointer=e.Location;if(polygonJustClosed&&e.Clicks>1){polygonJustClosed=false;return;}polygonJustClosed=false;if(PolygonPointerDown(e))return;if(FullCaptureSurface&&CaptureDown!=null&&CaptureDown(e))return;
             if(e.Button==MouseButtons.Left&&TrySampleColor(e.Location))return;if(Busy)return;Fit();
             if(!InPlaceViewport&&(e.Button==MouseButtons.Middle||e.Button==MouseButtons.Left&&spacePan)){panning=true;panFrom=e.Location;panStart=pan;panButton=e.Button;Capture=true;return;}
             if(Typing){CommitText();return;}if(e.Button==MouseButtons.Right){SelectShape(null);return;}if(e.Button!=MouseButtons.Left)return;Focus();
@@ -183,6 +184,7 @@ namespace ScreenCraft
                 drag=Drag.Move;BeginEditGesture(ToImg(e.Location,false));return;
             }
             if((InputModifiers&Keys.Control)!=0)return;SelectShape(null);if(!ScreenRect(Crop).Contains(e.Location))return;
+            if(Tool==Tool.Pen&&DefaultStyle.ClosedPen){BeginPolygon(point);return;}
             if(Tool==Tool.Text){StartText(point,null);return;}if(Tool==Tool.Callout){AddCallout(point);return;}
             if(Tool==Tool.Counter){Commit();var counter=NewShape(Tool.Counter);counter.A=counter.B=point;counter.Number=NextNumber();if(counter.LeaderCounter)counter.B=new PointF(point.X+64,point.Y+48);shapes.Add(counter);SelectShape(counter);NotifyEdit();return;}
             cur=NewShape(Tool);cur.A=cur.B=point;dragFrom=point;if(Tool==Tool.Pen)cur.Points=new List<PointF>{point};drag=Drag.Draw;Capture=true;Invalidate();
@@ -213,13 +215,13 @@ namespace ScreenCraft
         }
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            base.OnMouseMove(e);lastPointer=e.Location;if(FullCaptureSurface&&CaptureMove!=null&&CaptureMove(e))return;
+            base.OnMouseMove(e);lastPointer=e.Location;if(polygonDrawing){if(FullCaptureSurface&&CaptureMove!=null)CaptureMove(e);Cursor=cur.Points.Count>=3&&NearPolygonStart(e.Location)?Cursors.Hand:Cursors.Cross;return;}if(FullCaptureSurface&&CaptureMove!=null&&CaptureMove(e))return;
             if(panning){pan=new PointF(panStart.X+e.X-panFrom.X,panStart.Y+e.Y-panFrom.Y);Rescaled();return;}
             if(drag!=Drag.None)UpdateGesture(e.Location);else if(!Typing)UpdateHover(e.Location);
         }
         protected override void OnMouseUp(MouseEventArgs e)
         {
-            base.OnMouseUp(e);lastPointer=e.Location;if(FullCaptureSurface&&CaptureUp!=null&&CaptureUp(e))return;
+            base.OnMouseUp(e);lastPointer=e.Location;if(polygonDrawing)return;if(FullCaptureSurface&&CaptureUp!=null&&CaptureUp(e))return;
             if(panning){if(e.Button==panButton){panning=false;Capture=false;}return;}if(e.Button!=MouseButtons.Left||drag==Drag.None)return;
             UpdateGesture(e.Location);var completed=drag;drag=Drag.None;Capture=false;gestureShapes=null;gestureBefore=null;gestureRedo=null;orig=null;
             if(completed==Drag.Draw){var mark=cur;cur=null;if(mark.Kind==Tool.Crop){if(mark.Box.Width>=1&&mark.Box.Height>=1){Commit();Crop=RectangleF.Intersect(mark.Box,new RectangleF(PointF.Empty,Img.Size));NotifyEdit();}}
@@ -230,11 +232,11 @@ namespace ScreenCraft
         protected override void OnMouseLeave(EventArgs e){base.OnMouseLeave(e);if(!Busy){hover=null;Invalidate();}}
         public void CancelGesture()
         {
-            CancelColorPick();if(gestureBefore!=null&&gestureCommitted){if(undo.Count>0)undo.RemoveAt(undo.Count-1);Restore(gestureBefore);redo.Clear();if(gestureRedo!=null)redo.AddRange(gestureRedo);}cur=null;orig=null;drag=Drag.None;panning=false;gestureShapes=null;gestureBefore=null;gestureRedo=null;gestureCommitted=false;Capture=false;Fire(StateChanged);Invalidate();
+            polygonDrawing=false;polygonJustClosed=false;polygonRedo.Clear();CancelColorPick();if(gestureBefore!=null&&gestureCommitted){if(undo.Count>0)undo.RemoveAt(undo.Count-1);Restore(gestureBefore);redo.Clear();if(gestureRedo!=null)redo.AddRange(gestureRedo);}cur=null;orig=null;drag=Drag.None;panning=false;gestureShapes=null;gestureBefore=null;gestureRedo=null;gestureCommitted=false;Capture=false;Fire(StateChanged);Invalidate();
         }
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            base.OnKeyDown(e);if(Typing)return;
+            base.OnKeyDown(e);if(Typing)return;if(PolygonKey(e.KeyData)){e.Handled=true;e.SuppressKeyPress=true;return;}
             if(e.KeyCode==Keys.Escape){if(Busy)CancelGesture();else SelectShape(null);e.Handled=true;return;}
             if(e.KeyCode==Keys.ShiftKey&&(drag==Drag.Draw||drag==Drag.Resize||drag==Drag.Rotate))UpdateGesture(lastPointer);
             if(Busy)return;
@@ -253,14 +255,14 @@ namespace ScreenCraft
             string primary=selected==null?null:selected.Id;var ids=new HashSet<string>(SelectedShapes.Select(s=>s.Id));foreach(var mark in shapes)mark.DropCache();shapes=state.Shapes.Select(s=>s.Clone()).ToList();Crop=state.Crop;Bg=state.Background==null?null:state.Background.Clone();BgOn=state.BackgroundOn;OutputCornerRadius=state.OutputCornerRadius;
             selection.Clear();selection.AddRange(shapes.Where(s=>ids.Contains(s.Id)));selected=shapes.FirstOrDefault(s=>s.Id==primary);if(selected==null)selected=selection.LastOrDefault();hover=null;nudged=null;version++;if(LoadExtra!=null)LoadExtra(state.Extra);NotifyEdit();
         }
-        public void Undo(){if(Typing){CancelText();return;}CancelGesture();if(undo.Count==0)return;redo.Add(Take());var last=undo[undo.Count-1];undo.RemoveAt(undo.Count-1);Restore(last);}
-        public void Redo(){if(Typing||redo.Count==0)return;CancelGesture();undo.Add(Take());var last=redo[redo.Count-1];redo.RemoveAt(redo.Count-1);Restore(last);}
+        public void Undo(){if(polygonDrawing){UndoPolygonPoint();return;}if(Typing){CancelText();return;}CancelGesture();if(undo.Count==0)return;redo.Add(Take());var last=undo[undo.Count-1];undo.RemoveAt(undo.Count-1);Restore(last);}
+        public void Redo(){if(polygonDrawing){RedoPolygonPoint();return;}if(Typing||redo.Count==0)return;CancelGesture();undo.Add(Take());var last=redo[redo.Count-1];redo.RemoveAt(redo.Count-1);Restore(last);}
         public void SelectShape(Shape shape){selected=shape;SetSingleSelection(shape);movingNote=false;movingCounterBadge=false;Fire(StateChanged);Invalidate();}
         public void SetTool(Tool kind){CancelGesture();CommitText();Tool=kind;SelectShape(null);Cursor=kind==Tool.Text?Cursors.IBeam:Cursors.Cross;}
         public void SetColor(Color color)
         {
             Color=System.Drawing.Color.FromArgb(255,color);if(UsesOutlineFill(Tool)||Tool==Tool.Text)DefaultStyle.FillColor=System.Drawing.Color.FromArgb(DefaultStyle.FillColor.A,Color);
-            if(selected!=null)EditSelected(delegate(Shape mark){mark.Color=Color;if(mark.Kind==Tool.Text){mark.FillEnabled=true;mark.FillColor=Color;}else if(UsesOutlineFill(mark.Kind))mark.FillColor=System.Drawing.Color.FromArgb(mark.FillColor.A,Color);mark.HasNoteTextColor=true;mark.NoteTextColor=System.Drawing.Color.White;});PlaceBox();Fire(StateChanged);
+            if(selected!=null)EditSelected(delegate(Shape mark){mark.Color=Color;if(mark.Kind==Tool.Text){mark.FillEnabled=true;mark.FillColor=Color;}else if(UsesOutlineFill(mark.Kind))mark.FillColor=System.Drawing.Color.FromArgb(mark.FillColor.A,Color);mark.HasNoteTextColor=true;mark.NoteTextColor=System.Drawing.Color.White;});RefreshPolygonStyle();PlaceBox();Fire(StateChanged);Invalidate();
         }
         public void SetWeight(int weight){Weight=Math.Max(0,Math.Min(2,weight));if(selected!=null)EditSelected(delegate(Shape mark){mark.Weight=Weight;mark.Width=StrokeFor(Weight);mark.FontPx=FontFor(Weight);});PlaceBox();Fire(StateChanged);}
         public void DeleteSelected(){if(selected==null||Typing)return;DeleteSelection();}
@@ -268,7 +270,7 @@ namespace ScreenCraft
         public void Nudge(int dx,int dy){if(selected==null||Typing)return;if(nudged!=selected||nudgedAt!=version)Commit();nudged=selected;nudgedAt=version;foreach(var mark in SelectedShapes)mark.Offset(mark,dx,dy);NotifyEdit();}
         internal static void Renumber(List<Shape> list){int next=1;foreach(var mark in list.Where(s=>s.Kind==Tool.Counter).OrderBy(s=>s.Number))mark.Number=next++;}
         int NextNumber(){int value=0;foreach(var shape in shapes)if(shape.Kind==Tool.Counter)value=Math.Max(value,shape.Number);return value>=9999?9999:value+1;}
-        public string HintText{get{return Typing?"输入文字，Enter 完成，Shift+Enter 换行，Esc 取消":HasSelection?"拖动移动，拖动控制点缩放；Shift/Ctrl 多选；Delete 删除":"拖动绘制，Shift 约束比例；滚轮缩放";}}
+        public string HintText{get{return polygonDrawing?"单击加锚点；点击起点、双击或 Enter 闭合；右键/退格撤回，Esc 取消":Typing?"输入文字，Enter 完成，Shift+Enter 换行，Esc 取消":HasSelection?"拖动移动，拖动控制点缩放；Shift/Ctrl 多选；Delete 删除":Tool==Tool.Pen&&DefaultStyle.ClosedPen?"逐点多边形：单击加锚点，点击起点、双击或 Enter 闭合":"拖动绘制，Shift 约束比例；滚轮缩放";}}
 
         float InputSize{get{return editing==null?DefaultStyle.FontPx:Painter.HasNote(editing.Kind)?Painter.NoteFont(editing):editing.FontPx;}}
         Shape LiveInput(){var live=editing==null?NewInputShape():editing.Clone();live.Text=box==null?live.Text:box.Text;return live;}

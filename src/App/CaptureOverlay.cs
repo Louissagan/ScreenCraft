@@ -22,7 +22,7 @@ namespace ScreenCraft
         readonly CaptureSlider radiusSlider=new CaptureSlider{Minimum=0,Maximum=200,Value=0,Width=78};readonly Label radiusLabel=new CaptureLabel{Text="圆角 0",Width=64,Height=34,TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.Transparent};CaptureIconButton transparentText,solidText;
         readonly HashSet<Control> hiddenOptions=new HashSet<Control>();
         CaptureIconButton pointMode,cloudMode,counterMode,circleNumber,leaderNumber,autoWidth;Tool annotationTool=Tool.Callout;
-        CaptureIconButton outlineArrow,rawPen,smoothPen,freeArrow,closedPen,rotateSelection;
+        CaptureIconButton outlineArrow,rawPen,smoothPen,freeArrow,closedPen,rotateSelection,finishPolygon;
         CaptureIconButton mosaicBlocks,mosaicBlur,mosaicDots;
         readonly CaptureSlider labelWidth=new CaptureSlider{Minimum=60,Maximum=800,Value=320,Width=105};readonly Label widthValue=new CaptureLabel{Width=78,Height=34,BackColor=Color.Transparent,TextAlign=ContentAlignment.MiddleCenter};readonly Panel noteDivider=new Panel{Width=1,Height=23,BackColor=CaptureLook.Line,Margin=new Padding(4,6,4,3)};
         int rangeHandle=-1;Point dragStart;Rectangle originalRange;
@@ -55,7 +55,9 @@ namespace ScreenCraft
             arrowThin=Add(options,"arrow","细线箭头",delegate{Style(delegate(Shape s){s.SimpleArrow=true;s.ArrowWhiteOutline=false;},delegate(AnnotationStyle d){d.SimpleArrow=true;d.ArrowWhiteOutline=false;});});arrowBold=Add(options,"arrow-solid","渐宽箭头",delegate{Style(delegate(Shape s){s.SimpleArrow=false;s.ArrowWhiteOutline=false;},delegate(AnnotationStyle d){d.SimpleArrow=false;d.ArrowWhiteOutline=false;});});
             outlineArrow=Add(options,"arrow-outline","白边醒目箭头",delegate{Style(delegate(Shape s){s.SimpleArrow=false;s.ArrowWhiteOutline=true;s.Width=Math.Max(6,s.Width);},delegate(AnnotationStyle d){d.SimpleArrow=false;d.ArrowWhiteOutline=true;d.Width=Math.Max(6,d.Width);});});
             rawPen=Add(options,"pen","原始画笔线条",delegate{Style(delegate(Shape s){s.SmoothPen=false;},delegate(AnnotationStyle d){d.SmoothPen=false;});});smoothPen=Add(options,"pen-smooth","平滑画笔线条",delegate{Style(delegate(Shape s){s.SmoothPen=true;},delegate(AnnotationStyle d){d.SmoothPen=true;});});freeArrow=Add(options,"pen-arrow","自由曲线箭头",delegate{bool value=!(canvas.SelectedShape==null?canvas.DefaultStyle.FreehandArrow:canvas.SelectedShape.FreehandArrow);Style(delegate(Shape s){s.FreehandArrow=value;if(value)s.ClosedPen=false;},delegate(AnnotationStyle d){d.FreehandArrow=value;if(value)d.ClosedPen=false;});});
-            closedPen=Add(options,"pen-closed","自动闭合手绘线",delegate{canvas.SetClosedPen(!(canvas.SelectedShape==null?canvas.DefaultStyle.ClosedPen:canvas.SelectedShape.ClosedPen));});
+            closedPen=Add(options,"pen-closed","逐点多边形",delegate{canvas.SetClosedPen(!(canvas.SelectedShape==null?canvas.DefaultStyle.ClosedPen:canvas.SelectedShape.ClosedPen));});
+            tips.SetToolTip(closedPen,"逐点多边形：单击加锚点，点击起点、双击或 Enter 闭合；右键/退格撤回，Esc 取消。");
+            finishPolygon=Add(options,"done","完成多边形：点击起点、双击或 Enter；右键/退格撤回锚点",delegate{canvas.CompletePolygon();canvas.Focus();});
             rotateSelection=Add(options,"rotate","顺时针旋转 90°；拖动选框上方圆点自由旋转，Shift 吸附 15°",delegate{canvas.RotateSelected(90);});
             mosaicBlocks=Add(options,"pixelate","方块马赛克",delegate{Style(delegate(Shape s){s.RedactionMode=0;},delegate(AnnotationStyle d){d.RedactionMode=0;});});mosaicBlur=Add(options,"blur","柔化模糊",delegate{Style(delegate(Shape s){s.RedactionMode=1;},delegate(AnnotationStyle d){d.RedactionMode=1;});});mosaicDots=Add(options,"dots","彩点遮盖",delegate{Style(delegate(Shape s){s.RedactionMode=2;},delegate(AnnotationStyle d){d.RedactionMode=2;});});
             emptyFill=Add(options,"no-fill","无填充",delegate{canvas.SetShapeFill(false);});
@@ -136,10 +138,10 @@ namespace ScreenCraft
         void ApplyAnnotationColor(Color color){canvas.SetColor(color);}
         internal void ApplySampledColor(Color color){ApplyAnnotationColor(color);var host=CaptureHost.Running;var preferences=host==null?null:host.ColorPreferences;string value=ColorValues.Format(color,preferences==null?"RGB":preferences.ColorFormat,preferences==null||preferences.ColorUpper);try{CopyColorText(value);tips.SetToolTip(swatch,"已复制颜色 "+value);}catch(System.Runtime.InteropServices.ExternalException){tips.SetToolTip(swatch,"颜色 "+value+"；剪贴板忙，请重新取色复制。");}}
         void ShowMore(Control anchor){PrepareMoreMenu().Show(anchor,new Point(0,anchor.Height));}
-        void Copy(){canvas.CommitText();using(var image=canvas.Render())CaptureCompletion.Deliver(image,completionPreferences,OutputRoot,CopyOutput);Completed=true;Close();}
-        void Pin(){canvas.CommitText();var doc=canvas.ExportDocument();try{if(completionPreferences.HistoryEnabled)using(var image=doc.Render())new CaptureHistory(OutputRoot).Record(image,completionPreferences.HistoryLimit);PinOutput(doc);}catch{doc.Dispose();throw;}Completed=true;Close();}
-        void Save(){canvas.CommitText();using(var dialog=new SaveFileDialog{Filter="PNG 图片|*.png",FileName="截图.png"})if(dialog.ShowDialog(this)==DialogResult.OK)using(var image=canvas.Render())ImageFiles.SavePng(image,dialog.FileName);}
-        void ReadText(){canvas.CommitText();pendingOcr=canvas.Render();Completed=true;Close();}
+        void Copy(){if(!canvas.CompletePolygon())return;canvas.CommitText();using(var image=canvas.Render())CaptureCompletion.Deliver(image,completionPreferences,OutputRoot,CopyOutput);Completed=true;Close();}
+        void Pin(){if(!canvas.CompletePolygon())return;canvas.CommitText();var doc=canvas.ExportDocument();try{if(completionPreferences.HistoryEnabled)using(var image=doc.Render())new CaptureHistory(OutputRoot).Record(image,completionPreferences.HistoryLimit);PinOutput(doc);}catch{doc.Dispose();throw;}Completed=true;Close();}
+        void Save(){if(!canvas.CompletePolygon())return;canvas.CommitText();using(var dialog=new SaveFileDialog{Filter="PNG 图片|*.png",FileName="截图.png"})if(dialog.ShowDialog(this)==DialogResult.OK)using(var image=canvas.Render())ImageFiles.SavePng(image,dialog.FileName);}
+        void ReadText(){if(!canvas.CompletePolygon())return;canvas.CommitText();pendingOcr=canvas.Render();Completed=true;Close();}
         internal Bitmap TakeOcrImage(){var image=pendingOcr;pendingOcr=null;return image;}
         internal Canvas AnnotationCanvas{get{return canvas;}}internal Rectangle ToolbarBounds{get{return bar.Bounds;}}internal Rectangle OptionsBounds{get{return optionsBar.Bounds;}}
         internal bool IsOptionShown(Control control){return !hiddenOptions.Contains(control);}
@@ -196,7 +198,7 @@ namespace ScreenCraft
             EndRangeDrag();
         }
         static Cursor CursorFor(int handle){return handle==0||handle==4?Cursors.SizeNWSE:handle==2||handle==6?Cursors.SizeNESW:handle==1||handle==5?Cursors.SizeNS:Cursors.SizeWE;}
-        protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);if(e.Button==MouseButtons.Right){Close();return;}if(e.Button==MouseButtons.Left){BeginRangeDrag(-2,e.Location);Capture=true;}}
+        protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);if(canvas.DrawingPolygon){canvas.Focus();return;}if(e.Button==MouseButtons.Right){Close();return;}if(e.Button==MouseButtons.Left){BeginRangeDrag(-2,e.Location);Capture=true;}}
         protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(rangeHandle!=-1)UpdateRangeDrag(e.Location);}
         protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);if(e.Button==MouseButtons.Left&&rangeHandle!=-1){UpdateRangeDrag(e.Location);EndRangeDrag();Capture=false;canvas.Focus();}}
         protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture&&rangeHandle!=-1)CancelRangeDrag();}
@@ -212,6 +214,7 @@ namespace ScreenCraft
             if(anchorInput.ContainsFocus){if(anchorInput.HandleKey(keys,canvas.FocusInput))return true;return base.ProcessCmdKey(ref msg,keys);}
             if(strokeInput.ContainsFocus){if(strokeInput.HandleKey(keys,canvas.FocusInput))return true;return base.ProcessCmdKey(ref msg,keys);}
             if(canvas.Typing||(inspector!=null&&inspector.ContainsFocus))return base.ProcessCmdKey(ref msg,keys);
+            if(canvas.PolygonKey(keys))return true;
             if(canvas.ApplyArrangeKey(keys))return true;
             if(radiusSlider.Focused&&((keys&Keys.KeyCode)==Keys.Left||(keys&Keys.KeyCode)==Keys.Right)){radiusSlider.Value+=((keys&Keys.KeyCode)==Keys.Right?1:-1)*((keys&Keys.Shift)!=0?10:1);return true;}
             if(labelWidth.Focused&&((keys&Keys.KeyCode)==Keys.Left||(keys&Keys.KeyCode)==Keys.Right)){labelWidth.Value+=((keys&Keys.KeyCode)==Keys.Right?1:-1)*((keys&Keys.Shift)!=0?20:5);return true;}

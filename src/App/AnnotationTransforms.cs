@@ -110,8 +110,9 @@ namespace ScreenCraft
         }
         public void SetClosedPen(bool value)
         {
+            if(polygonDrawing)CancelGesture();
             if(selected==null)ChangeDefaultStyle(d=>{d.ClosedPen=value;if(value)d.FreehandArrow=false;});
-            else EditSelected(s=>{if(s.Kind==Tool.Pen){s.ClosedPen=value;if(value)s.FreehandArrow=false;}});
+            else{EditSelected(s=>{if(s.Kind==Tool.Pen){s.ClosedPen=value;if(!value)s.Polygon=false;if(value)s.FreehandArrow=false;}});DefaultStyle.ClosedPen=value;if(value)DefaultStyle.FreehandArrow=false;Fire(StateChanged);}
         }
     }
 }

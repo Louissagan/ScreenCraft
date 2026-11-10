@@ -75,6 +75,7 @@ namespace ScreenCraft
             CaptureTransitionTests.Run(Run,Check);
             AnnotationTransformTests.Run(Run,Check,output);
             NotificationAndSizingTests.Run(Run,Check,output);
+            PolygonDrawingTests.Run(Run,Check,output);
             Run("canvas/duplicate generates fresh IDs export remains editable",delegate{using(var c=NewCanvas()){c.AddAnnotation(Mark(Tool.Rect,20,20,160,100));c.DuplicateSelected();var list=c.AnnotationSnapshot;Check(list.Length==2&&list[0].Id!=list[1].Id,"duplicate ID");using(var doc=c.ExportDocument())Check(doc.Shapes.Length==2,"export");}});
             Run("editor/hidden control tree exposes full annotation controls",delegate{
                 using(var editor=new CraftEditor(White(600,400))){editor.CreateControl();Check(!editor.Visible,"editor became visible");var labels=new List<string>();CollectLabels(editor,labels);foreach(var name in new[]{"云线 W","画笔 B","钉在屏幕 P","线宽（px）","线型","圆角半径（px）","填充不透明度（%）","应用位置与大小","应用文字与序号"})Check(labels.Contains(name),"missing control: "+name);}

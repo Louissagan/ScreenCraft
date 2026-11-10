@@ -30,7 +30,7 @@ namespace ScreenCraft
         {
             canvas=c;Dock=DockStyle.Right;Width=280;BackColor=PreferencesLook.Background;Font=new Font("Microsoft YaHei UI",9);fields.BackColor=BackColor;Controls.Add(fields);
             fields.Controls.Add(new Label{Text="标注属性",AutoSize=true,Font=new Font(SystemFonts.MessageBoxFont,FontStyle.Bold)});fields.Controls.Add(target);
-            BeginGroup();Labelled("线宽（px）",width);Labelled("圆角半径（px）",radius);Labelled("线型",dash);Labelled("细线箭头",simpleArrow);Labelled("启用填充",fill);Labelled("自动闭合手绘线",closedPen);
+            BeginGroup();Labelled("线宽（px）",width);Labelled("圆角半径（px）",radius);Labelled("线型",dash);Labelled("细线箭头",simpleArrow);Labelled("启用填充",fill);Labelled("逐点多边形",closedPen);
             fields.Controls.Add(strokeColor);BeginGroup();Labelled("填充不透明度（%）",alpha);Labelled("字号（px）",font);Labelled("序号号码",number);Labelled("点大小／引线比例",markerSize);
             Labelled("文本宽度（px）",noteWidth);Labelled("随输入扩展",noteAuto);
             BeginGroup();

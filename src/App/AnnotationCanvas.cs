@@ -112,7 +112,7 @@ namespace ScreenCraft
 
         public AnnotationDocument ExportDocument()
         {
-            CommitText();if(InPlaceViewport)return ExportCaptureDocument();return new AnnotationDocument(new Bitmap(Img),AnnotationSnapshot,Crop,BgOn,Bg){OutputCornerRadius=OutputCornerRadius};
+            if(!CompletePolygon())throw new InvalidOperationException("请至少添加三个不共线的锚点，再完成多边形。");CommitText();if(InPlaceViewport)return ExportCaptureDocument();return new AnnotationDocument(new Bitmap(Img),AnnotationSnapshot,Crop,BgOn,Bg){OutputCornerRadius=OutputCornerRadius};
         }
 
         public void LoadDocument(AnnotationDocument doc)
