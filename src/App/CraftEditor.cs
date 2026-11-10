@@ -13,7 +13,7 @@ namespace ScreenCraft
         public Action RestoreSourceFocus;internal Action<Bitmap> CopyOutput=CaptureHost.CopyImage;internal Action<string> CommandError;
         readonly StatusStrip status=new StatusStrip();
         readonly ToolStripStatusLabel hint=new ToolStripStatusLabel();
-        readonly ToolTip tips=new ToolTip();readonly FlowLayoutPanel secondary=new FlowLayoutPanel{Dock=DockStyle.Top,Height=46,Padding=new Padding(8,4,8,4),BackColor=Color.White};readonly CaptureSlider quickSize=new CaptureSlider{Minimum=1,Maximum=100,Width=120};readonly Label quickValue=new Label{Width=90,Height=34,TextAlign=ContentAlignment.MiddleCenter};bool syncingQuick;
+        readonly ToolTip tips=new ToolTip();readonly FlowLayoutPanel secondary=new FlowLayoutPanel{Dock=DockStyle.Top,Height=46,Padding=new Padding(8,4,8,4),BackColor=Color.White};readonly CaptureSlider quickSize=new CaptureSlider{Minimum=1,Maximum=100,Width=120};readonly Label quickValue=new Label{Width=90,Height=34,TextAlign=ContentAlignment.MiddleCenter};readonly AnnotationSizeInput quickInput=new AnnotationSizeInput();bool syncingQuick;
         readonly Dictionary<Tool,CaptureIconButton> toolButtons=new Dictionary<Tool,CaptureIconButton>();
         public CraftEditor(Bitmap image):this(AnnotationDocument.FromImage(image),null){}
         public CraftEditor(AnnotationDocument ownedDocument,Action<AnnotationDocument> update)
@@ -53,17 +53,13 @@ namespace ScreenCraft
             var marker=new CaptureSlider{Minimum=8,Maximum=200,Width=100,AccessibleName="标记大小与引线"};var markerLabel=new Label{Text="点大小",Width=64,Height=34,TextAlign=ContentAlignment.MiddleCenter};secondary.Controls.Add(markerLabel);secondary.Controls.Add(marker);marker.ValueChanged+=delegate{if(!syncingQuick)canvas.SetMarkerSize(marker.Value);};
             secondary.Controls.Add(quickSize);secondary.Controls.Add(quickValue);
             quickSize.AccessibleName="当前工具尺寸";
-            quickSize.ValueChanged+=delegate{if(syncingQuick)return;if(canvas.ActiveKind==Tool.Crop){canvas.SetOutputCornerRadius(quickSize.Value);return;}if(canvas.ActiveKind==Tool.Pixelate){
-                if(canvas.SelectedShape!=null)canvas.EditSelected(delegate(Shape shape){shape.MosaicBlock=quickSize.Value;});
-                else canvas.ChangeDefaultStyle(delegate(AnnotationStyle style){style.MosaicBlock=quickSize.Value;});
-            }else if(canvas.ActiveKind==Tool.Text||canvas.ActiveHasNote){canvas.SetTextSize(quickSize.Value);}else if(canvas.SelectedShape!=null)canvas.EditSelected(delegate(Shape shape){shape.Width=quickSize.Value;});else canvas.ChangeDefaultStyle(delegate(AnnotationStyle style){style.Width=quickSize.Value;});};
+            secondary.Controls.Add(new PreferencesField(quickInput,76));quickInput.ValueChanged+=delegate{if(!syncingQuick)AnnotationSizing.Apply(canvas,(float)quickInput.Value);};
+            quickSize.ValueChanged+=delegate{if(!syncingQuick)AnnotationSizing.Apply(canvas,quickSize.Value);};
             canvas.StateChanged+=delegate{syncingQuick=true;try{bool text=canvas.ActiveKind==Tool.Text||canvas.ActiveHasNote;point.Visible=cloud.Visible=number.Visible=canvas.ActiveHasNote;color.Swatch=canvas.ActiveColor;marker.Visible=markerLabel.Visible=canvas.ActiveKind==Tool.Counter||canvas.ActiveKind==Tool.Callout;marker.Value=(int)canvas.ActiveMarkerSize;point.Selected=canvas.ActiveKind==Tool.Callout;cloud.Selected=canvas.ActiveKind==Tool.Cloud;number.Selected=canvas.ActiveKind==Tool.Counter;bool mosaic=canvas.ActiveKind==Tool.Pixelate;
                 var shape=canvas.SelectedShape;closed.Visible=canvas.ActiveKind==Tool.Pen;closed.Selected=shape==null?canvas.DefaultStyle.ClosedPen:shape.ClosedPen;rotate.Visible=canvas.HasSelection;
 
-                int block=shape==null?canvas.DefaultStyle.MosaicBlock:shape.MosaicBlock;
-                float value=canvas.ActiveKind==Tool.Crop?canvas.OutputCornerRadius:mosaic?(block==0?Math.Max(12,Math.Min(canvas.Img.Width,canvas.Img.Height)/45):block):text?canvas.ActiveTextSize:(shape==null?canvas.DefaultStyle.Width:shape.Width);
-                quickSize.Minimum=canvas.ActiveKind==Tool.Crop?0:mosaic?12:text?8:1;quickSize.Maximum=Math.Max(canvas.ActiveKind==Tool.Crop?200:mosaic?64:300,(int)Math.Ceiling(value));
-                quickSize.Value=(int)Math.Round(value);quickValue.Text=(canvas.ActiveKind==Tool.Crop?"导出圆角 ":mosaic?"色块 ":text?"字号 ":"线宽 ")+quickSize.Value;
+                float value;int minimum,maximum;string sizeLabel;AnnotationSizing.Range(canvas,out value,out minimum,out maximum,out sizeLabel);
+                quickSize.Minimum=minimum;quickSize.Maximum=maximum;quickSize.Value=(int)Math.Round(value);quickInput.Display(value,minimum,maximum);quickValue.Text=sizeLabel;
                 secondary.Visible=canvas.ActiveKind!=Tool.Redact||canvas.HasSelection;}finally{syncingQuick=false;}};
         }
         protected override void Dispose(bool disposing){if(disposing)tips.Dispose();base.Dispose(disposing);}
@@ -79,6 +75,7 @@ namespace ScreenCraft
         void SaveSegments(){using(var d=new FolderBrowserDialog{Description="选择空目录，按每段 4000 行导出当前图片"})if(d.ShowDialog(this)==DialogResult.OK)using(var b=RenderPresentation()){var files=SegmentedPng.Export(b,d.SelectedPath,4000);hint.Text="已导出 "+files.Length+" 段 PNG。";}}
         protected override bool ProcessCmdKey(ref Message msg,Keys keys)
         {
+            if(quickInput.ContainsFocus){if(quickInput.HandleKey(keys,canvas.FocusInput))return true;return base.ProcessCmdKey(ref msg,keys);}
             if(canvas.Typing || inspector.ContainsFocus)return base.ProcessCmdKey(ref msg,keys);
             if(canvas.ApplyArrangeKey(keys))return true;
             if(keys==(Keys.Control|Keys.Z)){canvas.Undo();return true;}if(keys==(Keys.Control|Keys.Y)){canvas.Redo();return true;}

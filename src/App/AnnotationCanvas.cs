@@ -6,7 +6,7 @@ namespace ScreenCraft
 {
     public sealed class AnnotationStyle
     {
-        public float Width=3, FontPx=22, Radius,MarkerSize=28,EffectOpacity=68;
+        public float Width=AnnotationSizing.DefaultWidth, FontPx=22, Radius,MarkerSize=28,EffectOpacity=68;
         public bool FillEnabled, SimpleArrow;
         public bool NoteAutoWidth=true,TextWrap=true,LeaderCounter;public float NoteWidth=320;
         public bool SmoothPen=true,FreehandArrow,ArrowWhiteOutline,ClosedPen;
@@ -28,6 +28,7 @@ namespace ScreenCraft
         internal Point ImageToControl(PointF point){Fit();return ToScreen(point);}
         internal Point[] SelectionHandles(){Fit();return selected==null?new Point[0]:ScreenHandles(selected);}
         public Shape SelectedShape { get { return selected; } }
+        internal void FocusInput(){Focus();}
         public int AnnotationCount { get { return shapes.Count; } }
         public Shape[] AnnotationSnapshot {get {return shapes.ConvertAll(delegate(Shape s){return s.Clone();}).ToArray();}}
 

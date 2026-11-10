@@ -17,6 +17,7 @@ namespace ScreenCraft
         readonly Label dimensions=new Label{AutoSize=false,Height=23,Width=140,BackColor=Color.FromArgb(38,42,48),ForeColor=Color.White,TextAlign=ContentAlignment.MiddleCenter,Cursor=Cursors.SizeAll};
         readonly ToolTip tips=new ToolTip();readonly Dictionary<Tool,CaptureIconButton> toolButtons=new Dictionary<Tool,CaptureIconButton>();
         readonly Rectangle[] handles=new Rectangle[8];readonly CaptureSlider stroke=new CaptureSlider{Width=78};readonly Label strokeValue=new CaptureLabel{Width=66,Height=32,TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.Transparent};
+        readonly AnnotationSizeInput strokeInput=new AnnotationSizeInput();PreferencesField strokeField;
         CaptureIconButton swatch,square,round,emptyFill,filled,solid,dash,undo,redo,arrowThin,arrowBold;bool syncing,inspectorOpen,refreshing,optionsShown=true;
         readonly CaptureSlider radiusSlider=new CaptureSlider{Minimum=0,Maximum=200,Value=0,Width=78};readonly Label radiusLabel=new CaptureLabel{Text="圆角 0",Width=64,Height=34,TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.Transparent};CaptureIconButton transparentText,solidText;
         readonly HashSet<Control> hiddenOptions=new HashSet<Control>();
@@ -65,8 +66,10 @@ namespace ScreenCraft
             circleNumber=Add(options,"counter","圆形序号",delegate{canvas.SetCounterLeader(false);});leaderNumber=Add(options,"counter-leader","引线序号",delegate{canvas.SetCounterLeader(true);});
             labelWidth.AccessibleName="文本宽度";tips.SetToolTip(labelWidth,"拖动控制文本宽度，自动换行；选中后的左右角点也可调整宽度。");labelWidth.ValueChanged+=delegate{if(!syncing)canvas.SetNoteWidth(labelWidth.Value);};options.Controls.Add(widthValue);options.Controls.Add(labelWidth);autoWidth=Add(options,"grow","随输入自动扩展（到宽度上限换行）",delegate{canvas.SetNoteAutoWidth(!(canvas.SelectedShape==null?canvas.DefaultStyle.NoteAutoWidth:canvas.SelectedShape.NoteAutoWidth));});
             radiusSlider.AccessibleName="圆角半径快捷调整";tips.SetToolTip(radiusSlider,"拖动或滚轮调整圆角半径；详细属性可输入精确值。");options.Controls.Add(radiusLabel);options.Controls.Add(radiusSlider);radiusSlider.ValueChanged+=delegate{if(!syncing){if(canvas.ActiveKind==Tool.Crop)canvas.SetOutputCornerRadius(radiusSlider.Value);else Style(delegate(Shape s){s.CornerRadius=radiusSlider.Value;},delegate(AnnotationStyle d){d.Radius=radiusSlider.Value;});}};
-            Separator(options);stroke.AccessibleName="线宽或字号";tips.SetToolTip(stroke,"拖动调整线宽；文字和序号工具调整字号。方向键可细调。详细属性支持精确值。");options.Controls.Add(strokeValue);options.Controls.Add(stroke);
-            stroke.ValueChanged+=delegate{if(syncing)return;if(canvas.ActiveKind==Tool.Pixelate)Style(delegate(Shape s){s.MosaicBlock=stroke.Value;},delegate(AnnotationStyle d){d.MosaicBlock=stroke.Value;});else if(canvas.ActiveKind==Tool.Spotlight)Style(s=>s.EffectOpacity=stroke.Value,d=>d.EffectOpacity=stroke.Value);else if(canvas.ActiveKind==Tool.Text||canvas.ActiveKind==Tool.Watermark||canvas.ActiveHasNote)canvas.SetTextSize(stroke.Value);else Style(delegate(Shape s){s.Width=stroke.Value;},delegate(AnnotationStyle d){d.Width=stroke.Value;});};
+            Separator(options);stroke.AccessibleName="线宽或字号";tips.SetToolTip(stroke,"拖动或输入数值；常用线宽 1–24 px，文字调整字号。");options.Controls.Add(strokeValue);options.Controls.Add(stroke);
+            stroke.ValueChanged+=delegate{if(!syncing)AnnotationSizing.Apply(canvas,stroke.Value);};
+            strokeField=new PreferencesField(strokeInput,76){Height=32,Margin=new Padding(2,0,4,0)};options.Controls.Add(strokeField);strokeInput.ValueChanged+=delegate{if(!syncing)AnnotationSizing.Apply(canvas,(float)strokeInput.Value);};
+
             BuildAnnotationControls();
             canvas.MouseCaptureChanged+=delegate{if(!canvas.Capture&&rangeHandle!=-1)CancelRangeDrag();};
             foreach(Control control in options.Controls){
@@ -142,7 +145,7 @@ namespace ScreenCraft
         internal bool IsOptionShown(Control control){return !hiddenOptions.Contains(control);}
         // Offline evidence: synthetic source + actual production canvas/bar renderers, never a desktop screenshot.
         internal Bitmap RenderSyntheticPreview(){var image=new Bitmap(Width,Height);using(var g=Graphics.FromImage(image)){CaptureOverlayGeometry.PaintSurround(g,canvas.Img,Rectangle.Round(canvas.Crop),dimPercent);using(var rendered=canvas.Render())g.DrawImageUnscaled(rendered,(int)canvas.Crop.X,(int)canvas.Crop.Y);SelectionAppearance.PaintFrame(g,Rectangle.Round(canvas.Crop),borderWidth,borderColor);foreach(var h in handles)SelectionAppearance.PaintHandle(g,h,borderColor);using(var fill=new SolidBrush(dimensions.BackColor))g.FillRectangle(fill,dimensions.Bounds);TextRenderer.DrawText(g,dimensions.Text,dimensions.Font,dimensions.Bounds,dimensions.ForeColor,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter);PaintBarPreview(g,bar,tools,null);if(optionsShown){PaintBarPreview(g,optionsBar,options,hiddenOptions);}using(var font=new Font("Segoe UI",9))g.DrawString("OFFSCREEN SYNTHETIC FIXTURE · NOT A DESKTOP SCREENSHOT",font,Brushes.White,12,Height-24);}return image;}
-        static void PaintBarPreview(Graphics g,CaptureBar surface,FlowLayoutPanel children,HashSet<Control> hidden){surface.PaintSurface(g,surface.Bounds);var origin=new Point(surface.Left+children.Left,surface.Top+children.Top);foreach(Control child in children.Controls){if(hidden!=null&&hidden.Contains(child))continue;var bounds=new Rectangle(origin.X+child.Left,origin.Y+child.Top,child.Width,child.Height);var button=child as CaptureIconButton;var slider=child as CaptureSlider;if(button!=null)button.PaintButton(g,bounds);else if(slider!=null)slider.PaintPreview(g,bounds.Location);else if(child is Label)PreferencesLook.Text(g,child.Text,child.Font,bounds,child.ForeColor);else using(var brush=new SolidBrush(child.BackColor))g.FillRectangle(brush,bounds);}}
+        static void PaintBarPreview(Graphics g,CaptureBar surface,FlowLayoutPanel children,HashSet<Control> hidden){surface.PaintSurface(g,surface.Bounds);var origin=new Point(surface.Left+children.Left,surface.Top+children.Top);foreach(Control child in children.Controls){if(hidden!=null&&hidden.Contains(child))continue;var bounds=new Rectangle(origin.X+child.Left,origin.Y+child.Top,child.Width,child.Height);var button=child as CaptureIconButton;var slider=child as CaptureSlider;if(button!=null)button.PaintButton(g,bounds);else if(slider!=null)slider.PaintPreview(g,bounds.Location);else if(child is Label)PreferencesLook.Text(g,child.Text,child.Font,bounds,child.ForeColor);else if(child is PreferencesField){var state=g.Save();g.TranslateTransform(bounds.X,bounds.Y);PreferencesPreview.Draw(g,child,children);g.Restore(state);}else using(var brush=new SolidBrush(child.BackColor))g.FillRectangle(brush,bounds);}}
         internal void BeginRangeDrag(int handle,Point at)
         {
             canvas.CommitText();
@@ -206,6 +209,8 @@ namespace ScreenCraft
                 if(keys==Keys.Escape){CancelRangeDrag();canvas.Capture=false;Capture=false;}
                 return true;
             }
+            if(anchorInput.ContainsFocus){if(anchorInput.HandleKey(keys,canvas.FocusInput))return true;return base.ProcessCmdKey(ref msg,keys);}
+            if(strokeInput.ContainsFocus){if(strokeInput.HandleKey(keys,canvas.FocusInput))return true;return base.ProcessCmdKey(ref msg,keys);}
             if(canvas.Typing||(inspector!=null&&inspector.ContainsFocus))return base.ProcessCmdKey(ref msg,keys);
             if(canvas.ApplyArrangeKey(keys))return true;
             if(radiusSlider.Focused&&((keys&Keys.KeyCode)==Keys.Left||(keys&Keys.KeyCode)==Keys.Right)){radiusSlider.Value+=((keys&Keys.KeyCode)==Keys.Right?1:-1)*((keys&Keys.Shift)!=0?10:1);return true;}

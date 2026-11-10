@@ -1,4 +1,4 @@
-param([switch]$SkipTests,[string]$DistributionDirectory='dist')
+﻿param([switch]$SkipTests,[string]$DistributionDirectory='dist')
 $ErrorActionPreference='Stop'
 $root=$PSScriptRoot
 if(!$SkipTests){$env:SCREENCRAFT_TEST_OUTPUT=Join-Path $root 'docs\evidence\automated';& (Join-Path $root 'build.ps1') -Test}
@@ -22,6 +22,7 @@ New-Item -ItemType Directory -Force $source | Out-Null
 foreach($folder in 'src','tests','tools'){Copy-Item -LiteralPath (Join-Path $root $folder) -Destination $source -Recurse}
 New-Item -ItemType Directory -Force (Join-Path $source 'docs') | Out-Null
 Get-ChildItem (Join-Path $root 'docs') -File | Copy-Item -Destination (Join-Path $source 'docs')
+if(Test-Path (Join-Path $root 'docs\images')){Copy-Item -LiteralPath (Join-Path $root 'docs\images') -Destination (Join-Path $source 'docs\images') -Recurse}
 # Automated evidence uses synthetic fixtures; private desktop captures stay in the local evidence folder.
 New-Item -ItemType Directory -Force (Join-Path $source 'docs\evidence') | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $source 'docs\evidence\automated') | Out-Null

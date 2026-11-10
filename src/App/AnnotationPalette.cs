@@ -28,21 +28,21 @@ namespace ScreenCraft
         {
             scale=displayScale;AutoScaleMode=AutoScaleMode.None;BackColor=Color.White;Font=new Font("Microsoft YaHei UI",13*scale,FontStyle.Regular,GraphicsUnit.Pixel);DoubleBuffered=true;Sample=pick;
             Heading("常用标注",8);Row(32,AnnotationColors.CommonNames,AnnotationColors.CommonHex,"常用",choose);
-            Heading("分析图",72);Row(96,AnnotationColors.AnalysisNames,AnnotationColors.AnalysisHex,"分析图",choose);
-            var custom=new SpectrumLaunchButton{Bounds=new Rectangle(Px(262),Px(32),Px(30),Px(30))};custom.Click+=delegate{SetExpanded(true);};tips.SetToolTip(custom,"自定义颜色 · 色相、RGB、HEX");Controls.Add(custom);
-            current.Bounds=new Rectangle(Px(12),Px(140),Px(230),Px(22));current.ForeColor=PreferencesLook.Muted;Controls.Add(current);
-            sample.Bounds=new Rectangle(Px(260),Px(134),Px(32),Px(32));sample.Click+=delegate{if(Sample!=null)Sample();};tips.SetToolTip(sample,"从原图取色 C");Controls.Add(sample);
+            Heading("分析图",108);Row(132,AnnotationColors.AnalysisNames,AnnotationColors.AnalysisHex,"分析图",choose);
+            var custom=new SpectrumLaunchButton{Bounds=new Rectangle(Px(262),Px(4),Px(30),Px(30))};custom.Click+=delegate{SetExpanded(true);};tips.SetToolTip(custom,"自定义颜色 · 色相、RGB、HEX");Controls.Add(custom);
+            current.Bounds=new Rectangle(Px(12),Px(212),Px(230),Px(22));current.ForeColor=PreferencesLook.Muted;Controls.Add(current);
+            sample.Bounds=new Rectangle(Px(260),Px(206),Px(32),Px(32));sample.Click+=delegate{if(Sample!=null)Sample();};tips.SetToolTip(sample,"从原图取色 C");Controls.Add(sample);
             foreach(Control control in Controls)presets.Add(control);
             customTitle=new Label{Text="自定义颜色",Bounds=new Rectangle(Px(12),Px(8),Px(168),Px(24)),ForeColor=PreferencesLook.Ink};Controls.Add(customTitle);
             back=new PreferencesButton{Text="返回预设",AccessibleName="返回预设颜色",Bounds=new Rectangle(Px(212),Px(4),Px(80),Px(28)),BackColor=Color.White};back.Click+=delegate{SetExpanded(false);};Controls.Add(back);
             Editor=new ColorEditor(scale,delegate(Color selected){SetCurrent(selected);choose(selected);}){Location=new Point(0,Px(36))};Controls.Add(Editor);
             SetCurrent(color);SetExpanded(false);
         }
-        void Heading(string text,int y){Controls.Add(new Label{Text=text,Bounds=new Rectangle(Px(12),Px(y),Px(280),Px(22)),ForeColor=PreferencesLook.Muted});}
-        void Row(int y,string[] names,string[] values,string group,Action<Color> choose){for(int i=0;i<values.Length;i++){var color=ColorTranslator.FromHtml("#"+values[i]);var button=new PaletteSwatch{Ink=color,Bounds=new Rectangle(Px(10+i*36),Px(y),Px(30),Px(30)),AccessibleName=group+" · "+names[i]+" #"+values[i],Tag=group};tips.SetToolTip(button,button.AccessibleName);button.Click+=delegate{SetCurrent(color);choose(color);};Controls.Add(button);}}
+        void Heading(string text,int y){Controls.Add(new Label{Text=text,Bounds=new Rectangle(Px(12),Px(y),Px(230),Px(22)),ForeColor=PreferencesLook.Muted});}
+        void Row(int y,string[] names,string[] values,string group,Action<Color> choose){for(int i=0;i<values.Length;i++){var color=ColorTranslator.FromHtml("#"+values[i]);var button=new PaletteSwatch{Ink=color,Bounds=new Rectangle(Px(10+(i%8)*36),Px(y+(i/8)*36),Px(30),Px(30)),AccessibleName=group+" · "+names[i]+" #"+values[i],Tag=group};tips.SetToolTip(button,button.AccessibleName);button.Click+=delegate{SetCurrent(color);choose(color);};Controls.Add(button);}}
         internal void SetExpanded(bool value)
         {
-            Expanded=value;SuspendLayout();foreach(var control in presets)control.Visible=!value;sample.Enabled=Sample!=null;sample.Visible=Sample!=null;sample.Bounds=value?new Rectangle(Px(168),Px(3),Px(32),Px(30)):new Rectangle(Px(260),Px(134),Px(32),Px(32));customTitle.Visible=back.Visible=Editor.Visible=value;Size=new Size(Px(304),Px(value?370:174));ResumeLayout();
+            Expanded=value;SuspendLayout();foreach(var control in presets)control.Visible=!value;sample.Enabled=Sample!=null;sample.Visible=Sample!=null;sample.Bounds=value?new Rectangle(Px(168),Px(3),Px(32),Px(30)):new Rectangle(Px(260),Px(206),Px(32),Px(32));customTitle.Visible=back.Visible=Editor.Visible=value;Size=new Size(Px(304),Px(value?370:246));ResumeLayout();
             var handler=ExpandedChanged;if(handler!=null)handler(this,EventArgs.Empty);
         }
         internal void SetCurrent(Color color){Current=Color.FromArgb(255,color);current.Text="当前 "+ColorValues.Format(color,"HEX",true);Editor.SetCurrent(Current);foreach(Control control in Controls){var swatch=control as PaletteSwatch;if(swatch!=null){swatch.Selected=swatch.Ink.ToArgb()==Current.ToArgb();swatch.Invalidate();}}}

@@ -6,11 +6,11 @@ namespace ScreenCraft
 {
     internal static class AnnotationColors
     {
-        // Sampled from the user's QQ toolbar and the two marked analysis-diagram palettes.
-        internal static readonly string[] CommonNames={"红色","黄色","绿色","蓝色","白色","灰色","黑色"};
-        internal static readonly string[] CommonHex={"FB3838","FFC23D","94D23D","0099FF","FFFFFF","999999","000000"};
-        internal static readonly string[] AnalysisNames={"青绿","暖黄","珊瑚红","灰蓝","草木绿","浅赭","粉紫"};
-        internal static readonly string[] AnalysisHex={"85C4C2","EACD5D","E75A5D","59899F","96B759","ECC199","E15498"};
+        // Keep the supplied QQ and diagram colors, with distinct complementary choices.
+        internal static readonly string[] CommonNames={"红色","橙色","黄色","黄绿","绿色","青绿","青色","蓝色","深蓝","靛蓝","紫色","玫红","棕色","白色","灰色","黑色"};
+        internal static readonly string[] CommonHex={"FB3838","FF9500","FFC23D","94D23D","34A853","009688","00BCD4","0099FF","2455A4","5856D6","9C4DCC","E83E8C","8D5A3B","FFFFFF","999999","000000"};
+        internal static readonly string[] AnalysisNames={"青绿","暖黄","珊瑚红","灰蓝","草木绿","浅赭","粉紫","砖红","橄榄","鼠尾草","石板蓝","灰紫"};
+        internal static readonly string[] AnalysisHex={"85C4C2","EACD5D","E75A5D","59899F","96B759","ECC199","E15498","B96D56","7B8E3D","8CA193","465D73","8F7D9D"};
         internal static readonly Color Default=ColorTranslator.FromHtml("#"+CommonHex[0]);
         internal static Color FromHsv(double hue,double saturation,double value)
         {

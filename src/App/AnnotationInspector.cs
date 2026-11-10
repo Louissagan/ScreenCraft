@@ -15,7 +15,7 @@ namespace ScreenCraft
         readonly Canvas canvas;
         readonly FlowLayoutPanel fields=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=true,Padding=new Padding(12)};
         readonly Label target=new Label{AutoSize=true,MaximumSize=new Size(235,0)};
-        readonly NumericUpDown width=Number(.25m,128,3,2),radius=Number(0,1000,0,0),alpha=Number(0,100,24,0),font=Number(8,300,22,0),number=Number(0,99999,1,0);
+        readonly NumericUpDown width=Number(1,AnnotationSizing.MaximumWidth,AnnotationSizing.DefaultWidth,2),radius=Number(0,1000,0,0),alpha=Number(0,100,24,0),font=Number(8,300,22,0),number=Number(0,99999,1,0);
         readonly NumericUpDown x=Number(-100000,100000,0,0),y=Number(-100000,100000,0,0),w=Number(1,100000,100,0),h=Number(1,100000,100,0);
         readonly CheckBox fill=new PreferencesSwitch{Text="启用填充"},simpleArrow=new PreferencesSwitch{Text="细线箭头"};
         readonly PreferencesChoice dash=new PreferencesChoice("实线","虚线","点线","点划线","双点划线");
@@ -71,7 +71,7 @@ namespace ScreenCraft
             try{
                 var s=canvas.SelectedShape;var d=canvas.DefaultStyle;
                 target.Text=s==null?"下一笔的默认属性":canvas.SelectionCount>1?"已选中 "+canvas.SelectionCount+" 个标注":"已选中："+ToolbarSettings.Name(s.Kind.ToString());
-                Value(width,(decimal)(s==null?d.Width:s.Width));Value(radius,(decimal)(s==null?d.Radius:s.CornerRadius));
+                width.Minimum=Math.Min(1,(decimal)(s==null?d.Width:s.Width));width.Maximum=Math.Max(AnnotationSizing.MaximumWidth,(decimal)(s==null?d.Width:s.Width));Value(width,(decimal)(s==null?d.Width:s.Width));Value(radius,(decimal)(s==null?d.Radius:s.CornerRadius));
                 Value(font,(decimal)canvas.ActiveTextSize);Value(alpha,(decimal)((s==null?d.FillColor:s.FillColor).A*100.0/255));
                 Value(markerSize,(decimal)canvas.ActiveMarkerSize);markerSize.Enabled=canvas.ActiveKind==Tool.Callout||canvas.ActiveKind==Tool.Counter;
                 Value(noteWidth,(decimal)canvas.ActiveNoteWidth);noteAuto.Checked=s==null?d.NoteAutoWidth:s.NoteAutoWidth;

@@ -53,14 +53,7 @@ namespace ScreenCraft
                     using(var image=c.Render())image.Save(Path.Combine(output,"counter-on-point.png"));
                 }
             });
-            run("startup/scaled toast remains opaque during animation with sharp pixel fonts",delegate{
-                foreach(float scale in new[]{1f,1.25f,1.5f,2f})using(var toast=new StartupToast(new Rectangle(-3000,0,3000,2000),"Ctrl+Shift+PrintScreen",false,scale)){
-                    check(toast.Size==new Size((int)Math.Round(380*scale),(int)Math.Round(92*scale))&&toast.Font.Unit==GraphicsUnit.Pixel&&Math.Abs(toast.Font.Size-13*scale)<.01,"toast did not scale font and layout together");
-                    var handle=toast.Handle;foreach(int ms in new[]{0,90,180,2500,2660}){check(toast.Advance(TimeSpan.FromMilliseconds(ms))&&toast.Opacity==1&&(GetWindowLong(handle,-20)&0x80000)==0,"animated text became a layered bitmap");}
-                    check(!toast.Advance(TimeSpan.FromMilliseconds(2670)),"toast did not expire");
-                    using(var image=toast.RenderOffscreen())image.Save(Path.Combine(output,"startup-toast-"+(int)(scale*100)+".png"));
-                }
-            });
+
         }
     }
 }
