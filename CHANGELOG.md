@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.9 development preview — 2026-11-19
+
+- 重新实现 MSI 安装定义及打包流程，保留现有的每用户安装路径与升级标识。
+- 替换来源复查中发现的画布、标注几何、引线命中和 DIB 初始化片段。见 [来源复查](docs/CORE_REWRITE.md#0109-来源复查)。
+
 ## 0.9.4 development preview — 2026-11-08
 
 - 自动保存目录默认使用 Windows 实际桌面目录，支持中文用户名、空格及 OneDrive／桌面重定向；不拼接用户名。

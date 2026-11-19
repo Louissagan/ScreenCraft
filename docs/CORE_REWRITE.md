@@ -41,3 +41,13 @@ Windows、.NET Framework、GDI+、UI Automation 和 Windows OCR 仍是平台能�
 Windows OCR 调用依据 [Microsoft API 文档](https://learn.microsoft.com/en-us/uwp/api/windows.media.ocr.ocrengine.recognizeasync)。
 
 本轮结果见 [0.10.0 测试记录](RELEASE_0.10.0.md)。
+
+## 0.10.9 来源复查
+
+以 `src/`、`tests/`、`tools/` 和根目录构建脚本为范围，核对来源声明，并比对历史记录所列的 Stackshot 和 Snapboard 修订。对 C# 使用去注释的连续词元初筛，人工复查匹配，区分共用 Windows ABI、常见 API 写法和可识别的复用片段。
+
+- 按现有安装需求和 Windows Installer 规则重新编写 `tools/ScreenCraft.wxs` 与 `tools/build-installer.ps1`。保留 ScreenCraft 的升级标识、组件 GUID、注册表路径、配置和快捷方式。升级、降级拦截以及保留用户数据由隔离产品验证。
+- 画布装饰层、文字输入控制、标注导出、控制点与引线命中改用项目共享实现。重写 DIB 初始化，并移出依赖旧版 Stackshot 程序集的基线探针。
+- 早期来源记录与许可证仍随仓库保留。此比对覆盖已知上游修订，不能识别所有形式的改写或证明与任何第三方项目完全无关。
+
+MSI 仍使用 WiX 的标准构建工具和对话框，运行时仍使用 Windows API 和本机 OCR。安装顺序依据 [Windows Installer 卸载条件](https://learn.microsoft.com/en-us/windows/win32/msi/conditioning-actions-to-run-during-removal) 和 [升级顺序](https://learn.microsoft.com/en-us/windows/win32/msi/removeexistingproducts-action)。

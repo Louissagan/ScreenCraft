@@ -22,9 +22,14 @@ namespace ScreenCraft
 
         internal static RectangleF PointBounds(IList<PointF> points)
         {
-            float x0=points[0].X, y0=points[0].Y, x1=x0, y1=y0;
-            foreach (var p in points) { x0=Math.Min(x0,p.X); y0=Math.Min(y0,p.Y); x1=Math.Max(x1,p.X); y1=Math.Max(y1,p.Y); }
-            return RectangleF.FromLTRB(x0,y0,x1,y1);
+            if(points.Count==0)return RectangleF.Empty;
+            var first=points[0];
+            var bounds=new RectangleF(first.X,first.Y,0,0);
+            for(int i=1;i<points.Count;i++){
+                var point=points[i];
+                bounds=RectangleF.Union(bounds,new RectangleF(point.X,point.Y,0,0));
+            }
+            return bounds;
         }
     }
 

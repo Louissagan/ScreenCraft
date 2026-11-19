@@ -24,7 +24,17 @@ namespace ScreenCraft
         public void SelectAll(){CommitText();nudged=null;selection.Clear();selection.AddRange(shapes.Where(OnActiveLayer));selected=selection.LastOrDefault();movingNote=false;movingCounterBadge=false;Invalidate();Fire(StateChanged);}
         internal RectangleF SelectedBounds{get{return GroupBounds();}}
         RectangleF GroupBounds(){var items=SelectedShapes;var r=Painter.Bounds(items[0]);foreach(var s in items.Skip(1))r=RectangleF.Union(r,Painter.Bounds(s));return r;}
-        internal static PointF[] BoxHandles(RectangleF b){return new[]{new PointF(b.Left,b.Top),new PointF(b.Right,b.Top),new PointF(b.Right,b.Bottom),new PointF(b.Left,b.Bottom),new PointF(b.Left+b.Width/2,b.Top),new PointF(b.Right,b.Top+b.Height/2),new PointF(b.Left+b.Width/2,b.Bottom),new PointF(b.Left,b.Top+b.Height/2)};}
+        internal static PointF[] BoxHandles(RectangleF bounds)
+        {
+            var center=Painter.Center(bounds);
+            var topLeft=bounds.Location;
+            var bottomRight=new PointF(bounds.Right,bounds.Bottom);
+            return new[]{
+                topLeft,new PointF(bottomRight.X,topLeft.Y),bottomRight,new PointF(topLeft.X,bottomRight.Y),
+                new PointF(center.X,topLeft.Y),new PointF(bottomRight.X,center.Y),
+                new PointF(center.X,bottomRight.Y),new PointF(topLeft.X,center.Y)
+            };
+        }
         internal static RectangleF ResizeBounds(RectangleF b,int handle,PointF p,bool square)
         {
             float left=b.Left,right=b.Right,top=b.Top,bottom=b.Bottom;

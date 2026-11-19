@@ -67,7 +67,13 @@ namespace ScreenCraft
         public Tool ActiveKind{get{return selected==null?Tool:selected.Polygon?Tool.PenPath:selected.Kind;}}
         public int ActiveWeight{get{return selected==null?Weight:selected.Weight;}}
         public Rectangle CropRect{get{return Rectangle.Round(Crop);}}
-        Size OutputSizeRaw{get{return new Size(Math.Max(1,(int)Math.Round(Crop.Width)),Math.Max(1,(int)Math.Round(Crop.Height)));}}
+        Size OutputSizeRaw
+        {
+            get{
+                var pixels=Size.Round(Crop.Size);
+                return new Size(Math.Max(pixels.Width,1),Math.Max(pixels.Height,1));
+            }
+        }
         public Size OutputSize{get{if(!BgOn||Bg==null)return OutputSizeRaw;Size size;Rectangle inner,card;var info=Info();Backdrop.Measure(OutputSizeRaw,Bg,false,info==null?Padding.Empty:info.Inset,out size,out card,out inner);return size;}}
         int Pu(float value){return Math.Max(1,(int)Math.Round(value*Ui));}
         float StrokeFor(int weight){return 3*Weights[Math.Max(0,Math.Min(2,weight))];}
@@ -76,7 +82,7 @@ namespace ScreenCraft
         void NotifyEdit(){Fire(Changed);Fire(StateChanged);Invalidate();}
         Backdrop.ShotInfo Info(){if(Video||Bg==null)return null;var next=Backdrop.Study(Img,CropRect,Bg,backdropInfo);if(backdropInfo!=null&&next!=backdropInfo)backdropInfo.Dispose();return backdropInfo=next;}
         public Bitmap BlurThumb(){var info=Info();return info==null?null:Backdrop.BlurOf(info,Img,CropRect);}
-        public void BackdropChanged(){Rescaled();Invalidate();}
+        public void BackdropChanged(){Rescaled();}
 
         void Fit()
         {
@@ -94,7 +100,16 @@ namespace ScreenCraft
         Point ToScreen(PointF point){return new Point((int)Math.Round(off.X+point.X*k),(int)Math.Round(off.Y+point.Y*k));}
         PointF ToImg(Point point,bool clamp){float x=(point.X-off.X)/k,y=(point.Y-off.Y)/k;if(clamp){x=Math.Max(0,Math.Min(Img.Width,x));y=Math.Max(0,Math.Min(Img.Height,y));}return new PointF(x,y);}
         Rectangle ScreenRect(RectangleF rectangle){var a=ToScreen(rectangle.Location);var b=ToScreen(new PointF(rectangle.Right,rectangle.Bottom));return Rectangle.FromLTRB(a.X,a.Y,b.X,b.Y);}
-        public void Rescaled(){Fit();if(box!=null)box.RefreshBackdrop();PlaceBox();Invalidate();}
+        public void Rescaled()
+        {
+            Fit();
+            var input=box;
+            if(input!=null){
+                input.RefreshBackdrop();
+                PlaceBox();
+            }
+            Invalidate();
+        }
         public int ZoomPercent{get{Fit();return (int)Math.Round(k*100);}}
         public bool Zoomed{get{return Math.Abs(zoom-1)>.001||pan!=PointF.Empty;}}
         public void ZoomAt(Point point,float factor)
@@ -112,7 +127,8 @@ namespace ScreenCraft
         {
             if(released||Img==null)return;
             Fit();PaintScene(e.Graphics);
-            if(FullCaptureSurface)PaintFrozenAdornments(e.Graphics);else PaintAdornments(e.Graphics);
+            PaintAdornments(e.Graphics);
+            if(FullCaptureSurface&&PaintCaptureChrome!=null)PaintCaptureChrome(e.Graphics);
         }
         void PaintScene(Graphics g)
         {
@@ -145,8 +161,8 @@ namespace ScreenCraft
         void PaintAdornments(Graphics g)
         {
             PaintPolygonAnchors(g);
-            if(cur!=null&&cur.Kind==Tool.Crop){using(var pen=new Pen(CaptureLook.Blue,1))g.DrawRectangle(pen,ScreenRect(cur.Box));}
-            if(hover!=null&&hover!=selected&&!Busy)Outline(g,hover,false);
+            if(!FullCaptureSurface&&cur!=null&&cur.Kind==Tool.Crop){using(var pen=new Pen(CaptureLook.Blue,1))g.DrawRectangle(pen,ScreenRect(cur.Box));}
+            if(hover!=null&&hover!=selected&&(FullCaptureSurface?drag==Drag.None&&!Typing:!Busy))Outline(g,hover,false);
             if(selected!=null&&!Typing){if(SelectionCount>1)OutlineGroup(g);else if(!EditingPath)Outline(g,selected,true);}
             if(Typing)BoxLabel(g);
         }
@@ -286,7 +302,13 @@ namespace ScreenCraft
                 else if(mark.Kind==Tool.Spotlight?mark.Box.Width>=1&&mark.Box.Height>=1:mark.Kind==Tool.Pen||mark.Box.Width+mark.Box.Height>=1){Commit();shapes.Add(mark);SelectShape(mark);NotifyEdit();if(mark.Kind==Tool.Cloud){movingNote=true;PlaceNoteInside(mark);StartText(mark.A,mark);}}
             }Fire(StateChanged);Invalidate();
         }
-        protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture&&(drag!=Drag.None||panning||pathDragging))CancelGesture();}
+        protected override void OnMouseCaptureChanged(EventArgs e)
+        {
+            base.OnMouseCaptureChanged(e);
+            if(Capture)return;
+            bool interrupted=panning||pathDragging||drag!=Drag.None;
+            if(interrupted)CancelGesture();
+        }
         protected override void OnMouseLeave(EventArgs e){base.OnMouseLeave(e);if(!Busy){hover=null;Invalidate();}}
         public void CancelGesture()
         {
@@ -345,8 +367,21 @@ namespace ScreenCraft
             if(Typing)CommitText();if(DrawStart!=null)DrawStart();editing=existing;boxAt=point;
             box=new AnnotationTextInput{Visible=false,Multiline=true,BorderStyle=BorderStyle.None,MaxLength=20000,AcceptsReturn=true,Text=existing==null?"":existing.Text??""};
             box.TextChanged+=delegate{PlaceBox();};box.CompositionChanged+=PlaceBox;
-            box.KeyDown+=delegate(object sender,KeyEventArgs e){if(((AnnotationTextInput)sender).Composition!=null)return;if(e.KeyCode==Keys.Enter&&!e.Shift){e.SuppressKeyPress=true;CommitText();}else if(e.KeyCode==Keys.Escape){e.SuppressKeyPress=true;CancelText();}};
+            box.KeyDown+=HandleTextCommand;
             Controls.Add(box);PlaceBox();box.Show();box.Focus();box.SelectionStart=box.TextLength;Fire(StateChanged);
+        }
+        void HandleTextCommand(object sender,KeyEventArgs e)
+        {
+            var input=(AnnotationTextInput)sender;
+            if(input.Composition!=null)return;
+            Action command=null;
+            switch(e.KeyCode){
+                case Keys.Escape:command=CancelText;break;
+                case Keys.Enter:if(!e.Shift)command=CommitText;break;
+            }
+            if(command==null)return;
+            e.SuppressKeyPress=true;
+            command();
         }
         void PlaceBox()
         {
@@ -417,9 +452,24 @@ namespace ScreenCraft
         Bitmap RenderContent(bool preview)
         {
             var area=CropRect;var result=CopyArea(Img,area);
-            try{using(var g=Graphics.FromImage(result)){g.TranslateTransform(-area.X,-area.Y);Painter.DrawMarks(g,shapes,preview&&cur!=null&&cur.Kind!=Tool.Crop?cur:null,preview?editing:null,Img,area);if(preview)PaintEditingAnchor(g);}if(BgOn&&Bg!=null){BackgroundStyle.Validate(Bg,result.Size);var composed=Backdrop.Compose(result,Bg,Info());result.Dispose();result=composed;}return RoundOutput(result,OutputCornerRadius);}catch{result.Dispose();throw;}
+            try{PaintExportLayer(result,area,preview);if(BgOn&&Bg!=null){BackgroundStyle.Validate(Bg,result.Size);var composed=Backdrop.Compose(result,Bg,Info());result.Dispose();result=composed;}return RoundOutput(result,OutputCornerRadius);}catch{result.Dispose();throw;}
         }
-        public Bitmap RenderMarks(Rectangle area){var result=new Bitmap(Math.Max(1,area.Width),Math.Max(1,area.Height),PixelFormat.Format32bppArgb);try{using(var g=Graphics.FromImage(result)){g.TranslateTransform(-area.X,-area.Y);Painter.DrawMarks(g,shapes,null,null,Img,area);}return result;}catch{result.Dispose();throw;}}
+        void PaintExportLayer(Bitmap target,Rectangle area,bool preview)
+        {
+            var draft=preview&&cur!=null&&cur.Kind!=Tool.Crop?cur:null;
+            var hidden=preview?editing:null;
+            using(var graphics=Graphics.FromImage(target)){
+                graphics.TranslateTransform(-area.Left,-area.Top);
+                Painter.DrawMarks(graphics,shapes,draft,hidden,Img,area);
+                if(preview)PaintEditingAnchor(graphics);
+            }
+        }
+        public Bitmap RenderMarks(Rectangle area)
+        {
+            var result=new Bitmap(Math.Max(1,area.Width),Math.Max(1,area.Height),PixelFormat.Format32bppArgb);
+            try{PaintExportLayer(result,area,false);return result;}
+            catch{result.Dispose();throw;}
+        }
         public void ShowPlayFrame(byte[] pixels,int width,int height)
         {
             var frame=new Bitmap(width,height,PixelFormat.Format32bppArgb);var data=frame.LockBits(new Rectangle(Point.Empty,frame.Size),ImageLockMode.WriteOnly,PixelFormat.Format32bppArgb);try{for(int row=0;row<height;row++)System.Runtime.InteropServices.Marshal.Copy(pixels,row*width*4,IntPtr.Add(data.Scan0,row*data.Stride),width*4);}finally{frame.UnlockBits(data);}if(playFrame!=null)playFrame.Dispose();playFrame=frame;if(IsHandleCreated&&!IsDisposed)BeginInvoke((Action)Invalidate);

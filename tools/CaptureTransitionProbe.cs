@@ -90,7 +90,7 @@ class CaptureTransitionProbe
     [STAThread] static int Main(string[] arguments)
     {
         if(arguments.Length<2)return 2;Directory.CreateDirectory(arguments[1]);SetProcessDpiAwarenessContext(new IntPtr(-4));Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
-        application=Assembly.LoadFrom(Path.GetFullPath(arguments[0]));prefix=application.GetType("ScreenCraft.RegionPicker")!=null?"ScreenCraft":"Stackshot";Type("Theme").GetMethod("Init").Invoke(null,null);
+        application=Assembly.LoadFrom(Path.GetFullPath(arguments[0]));prefix="ScreenCraft";Type("Theme").GetMethod("Init").Invoke(null,null);
         bool stall=Array.IndexOf(arguments,"--stall")>=0,protectedRun=Array.IndexOf(arguments,"--protected")>=0;
         verifyGate=application.GetType(prefix+".CaptureSurfaceForm")!=null;verifyAffinity=protectedRun;
         var display=application.GetType(prefix+".CaptureDisplay");if(display!=null&&!protectedRun){var exclusion=display.GetField("ExcludeFromCapture",BindingFlags.NonPublic|BindingFlags.Static);if(exclusion!=null){exclusion.SetValue(null,(Action<IntPtr>)delegate{});pixelProbeEnabled=true;}}

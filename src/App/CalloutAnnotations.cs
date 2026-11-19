@@ -34,7 +34,12 @@ namespace ScreenCraft
         public float ActiveNoteWidth{get{return selected==null?DefaultStyle.NoteWidth:selected.NoteWidth;}}
         public void SetNoteWidth(float width,bool preserveAutoSize=false){width=Math.Max(60,Math.Min(800,width));if(selected==null)ChangeDefaultStyle(delegate(AnnotationStyle d){d.NoteWidth=width;if(!preserveAutoSize)d.NoteAutoWidth=false;});else EditSelected(delegate(Shape s){s.NoteWidth=width;if(!preserveAutoSize)s.NoteAutoWidth=false;if(s.Kind==Tool.Text)s.TextWrap=true;});}
         public void SetNoteAutoWidth(bool value){if(selected==null)ChangeDefaultStyle(delegate(AnnotationStyle d){d.NoteAutoWidth=value;});else EditSelected(delegate(Shape s){s.NoteAutoWidth=value;if(value)s.NoteHeight=0;if(s.Kind==Tool.Text)s.TextWrap=true;});}
-        static bool LeaderHit(PointF p,PointF a,RectangleF body,float tolerance){if(body.Contains(p))return true;var b=new PointF(Math.Max(body.Left,Math.Min(body.Right,a.X)),Math.Max(body.Top,Math.Min(body.Bottom,a.Y)));float dx=b.X-a.X,dy=b.Y-a.Y,den=dx*dx+dy*dy;float t=den<.001f?0:Math.Max(0,Math.Min(1,((p.X-a.X)*dx+(p.Y-a.Y)*dy)/den));float ex=p.X-a.X-t*dx,ey=p.Y-a.Y-t*dy;return ex*ex+ey*ey<=tolerance*tolerance;}
+        static bool LeaderHit(PointF point,PointF anchor,RectangleF body,float tolerance)
+        {
+            if(body.Contains(point))return true;
+            var attachment=new PointF(Math.Max(body.Left,Math.Min(body.Right,anchor.X)),Math.Max(body.Top,Math.Min(body.Bottom,anchor.Y)));
+            return SegmentDistance(point,anchor,attachment)<=tolerance;
+        }
         public void SetCounterLeader(bool value){if(selected!=null&&selected.Kind==Tool.Counter)EditSelected(delegate(Shape s){s.LeaderCounter=value;if(value&&s.B==s.A)s.B=new PointF(s.A.X+64,s.A.Y+48);});else ChangeDefaultStyle(delegate(AnnotationStyle d){d.LeaderCounter=value;});}
         public void SetAnnotationMode(Tool kind)
         {

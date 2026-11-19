@@ -1,4 +1,4 @@
-param([string]$OutputDirectory='docs/evidence/automated/installer-0.9.0')
+﻿param([string]$OutputDirectory='docs/evidence/automated/installer-0.9.0',[string]$PreviousIsolatedMsi)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $output=if([IO.Path]::IsPathRooted($OutputDirectory)){[IO.Path]::GetFullPath($OutputDirectory)}else{[IO.Path]::GetFullPath((Join-Path $root $OutputDirectory))}
@@ -12,22 +12,36 @@ $startupPath='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $oldStartup=(Get-ItemProperty $startupPath -ErrorAction SilentlyContinue).ScreenCraft
 $results=New-Object Collections.Generic.List[object]
 function Check([string]$name,[bool]$ok){if(!$ok){throw $name};$results.Add([pscustomobject]@{Test=$name;Status='PASS'});Write-Output ('PASS '+$name)}
-function Run-Msi([string[]]$arguments){$process=Start-Process -FilePath (Join-Path $env:WINDIR 'System32\msiexec.exe') -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait;if($process.ExitCode -ne 0){throw ('msiexec failed: '+$process.ExitCode)}}
+function Run-Msi([string[]]$arguments,[int]$expected=0){$process=Start-Process -FilePath (Join-Path $env:WINDIR 'System32\msiexec.exe') -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait;if($process.ExitCode -ne $expected){throw ('msiexec failed: '+$process.ExitCode)}}
 $installed=$false;$code=$null
 try{
- & (Join-Path $PSScriptRoot 'build-installer.ps1') -DistributionDirectory $scope -IsolatedTest -VersionOverride '0.9.0'
  $msi=Join-Path $scope 'ScreenCraft-InstallerTest.msi'
- Run-Msi @('/i',('"'+$msi+'"'),'/qn','/norestart',('INSTALLFOLDER="'+$app+'"'),('USERMENUDIR="'+$menu+'"'),'/l*v',('"'+(Join-Path $output 'install.log')+'"'))
+ if($PreviousIsolatedMsi){
+  $previous=(Resolve-Path -LiteralPath $PreviousIsolatedMsi).Path
+ }else{
+  & (Join-Path $PSScriptRoot 'build-installer.ps1') -DistributionDirectory $scope -IsolatedTest -VersionOverride '0.9.0'
+  $previous=Join-Path $scope 'previous-isolated.msi'
+  Copy-Item -LiteralPath $msi -Destination $previous
+ }
+ Run-Msi @('/i',('"'+$previous+'"'),'/qn','/norestart',('INSTALLFOLDER="'+$app+'"'),('USERMENUDIR="'+$menu+'"'),'/l*v',('"'+(Join-Path $output 'install.log')+'"'))
  $installed=$true;$code=(Get-ItemProperty $testKey).ProductCode
  Check 'isolated per-user MSI installs files and two shortcuts without showing application' ((Test-Path (Join-Path $app 'ScreenCraft.exe')) -and (Test-Path (Join-Path $menu 'ScreenCraft.lnk')) -and (Test-Path (Join-Path $menu 'ScreenCraft 设置.lnk')))
- Check 'installed payload matches compiled EXE and excludes portable.flag' (((Get-FileHash (Join-Path $app 'ScreenCraft.exe')).Hash -eq (Get-FileHash (Join-Path $root 'bin/Release/ScreenCraft.exe')).Hash) -and !(Test-Path (Join-Path $app 'portable.flag')))
+ Check 'initial MSI excludes portable.flag' (!(Test-Path (Join-Path $app 'portable.flag')))
  Set-Content (Join-Path $app 'user-saved.png') 'USER SAVED SENTINEL'
  New-Item -ItemType Directory -Force (Join-Path $app 'Data') | Out-Null
  Set-Content (Join-Path $app 'Data/settings.json') 'USER CONFIG SENTINEL'
  & (Join-Path $PSScriptRoot 'build-installer.ps1') -DistributionDirectory $scope -IsolatedTest -VersionOverride '0.9.1'
- Run-Msi @('/i',('"'+$msi+'"'),'/qn','/norestart',('INSTALLFOLDER="'+$app+'"'),('USERMENUDIR="'+$menu+'"'),'/l*v',('"'+(Join-Path $output 'upgrade.log')+'"'))
+ Run-Msi @('/i',('"'+$msi+'"'),'/qn','/norestart','/l*v',('"'+(Join-Path $output 'upgrade.log')+'"'))
  $new=(Get-ItemProperty $testKey);$code=$new.ProductCode
  Check 'major upgrade replaces registration and preserves saved image and settings' ($new.InstalledVersion -eq '0.9.1' -and (Test-Path (Join-Path $app 'user-saved.png')) -and (Test-Path (Join-Path $app 'Data/settings.json')))
+ Check 'upgraded payload matches the current executable at the registered path' ((Get-FileHash (Join-Path $app 'ScreenCraft.exe')).Hash -eq (Get-FileHash (Join-Path $root 'bin/Release/ScreenCraft.exe')).Hash)
+ Run-Msi @('/i',('"'+$previous+'"'),'/qn','/norestart','/l*v',('"'+(Join-Path $output 'downgrade.log')+'"')) 1603
+ Check 'downgrade is blocked and leaves the upgraded product registered' ((Get-ItemProperty $testKey).ProductCode -eq $code)
+ & (Join-Path $PSScriptRoot 'build-installer.ps1') -DistributionDirectory $scope -IsolatedTest -VersionOverride '0.9.1'
+ Run-Msi @('/i',('"'+$msi+'"'),'/qn','/norestart','/l*v',('"'+(Join-Path $output 'same-version.log')+'"'))
+ $priorCode=$code
+ $code=(Get-ItemProperty $testKey).ProductCode
+ Check 'same-version replacement changes product code and keeps data and shortcuts' ($code -ne $priorCode -and (Test-Path (Join-Path $app 'user-saved.png')) -and (Test-Path (Join-Path $menu 'ScreenCraft 设置.lnk')))
  Run-Msi @('/x',$code,'/qn','/norestart','/l*v',('"'+(Join-Path $output 'uninstall.log')+'"'))
  $installed=$false
  $owned=@('ScreenCraft.exe','ScreenCraft.exe.config','LICENSE','THIRD_PARTY_NOTICES.md','COLORBREWER_LICENSE.txt','WIX_LICENSE.txt','USER_GUIDE.md','KNOWN_LIMITATIONS.md')

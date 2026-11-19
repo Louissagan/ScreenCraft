@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -20,10 +20,13 @@ namespace ScreenCraft
         public readonly Bitmap Bitmap;
         IntPtr allocation,previous;
         bool disposed;
-        public Dib(int width,int height):this(width,height,false) { }
-        public Dib(int width,int height,bool premultiplied)
+        public Dib(int width,int height):this(new Size(width,height),PixelFormat.Format32bppRgb) { }
+        public Dib(int width,int height,bool premultiplied):
+            this(new Size(width,height),premultiplied?PixelFormat.Format32bppPArgb:PixelFormat.Format32bppRgb) { }
+        Dib(Size requestedSize,PixelFormat pixelFormat)
         {
-            Width=Math.Max(1,width);Height=Math.Max(1,height);
+            Width=Math.Max(1,requestedSize.Width);
+            Height=Math.Max(1,requestedSize.Height);
             if((long)Width*Height>64000000)throw new ArgumentOutOfRangeException("width","图像超过 6400 万像素。");
             try{
                 Dc=Native.CreateCompatibleDC(IntPtr.Zero);if(Dc==IntPtr.Zero)throw new Win32Exception();
@@ -31,7 +34,7 @@ namespace ScreenCraft
                 IntPtr pixels;allocation=Native.CreateDIBSection(Dc,ref header,0,out pixels,IntPtr.Zero,0);Bits=pixels;
                 if(allocation==IntPtr.Zero||Bits==IntPtr.Zero)throw new Win32Exception();
                 previous=Native.SelectObject(Dc,allocation);if(previous==IntPtr.Zero||previous==new IntPtr(-1))throw new Win32Exception();
-                Bitmap=new Bitmap(Width,Height,checked(Width*4),premultiplied?PixelFormat.Format32bppPArgb:PixelFormat.Format32bppRgb,Bits);
+                Bitmap=new Bitmap(Width,Height,checked(Width*4),pixelFormat,Bits);
             }catch{Dispose();throw;}
         }
         void CheckAlive(){if(disposed)throw new ObjectDisposedException("Dib");}

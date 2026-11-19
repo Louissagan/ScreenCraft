@@ -34,10 +34,6 @@ namespace ScreenCraft
         {
             PaintCaptureBackdrop(g);var state=g.Save();using(var path=Theme.Round(Crop,Math.Min(OutputCornerRadius,Math.Min(Crop.Width,Crop.Height)/2)))g.SetClip(path,CombineMode.Intersect);Painter.DrawMarks(g,shapes,cur!=null&&cur.Kind!=Tool.Crop?cur:null,editing,Img,Crop);PaintEditingAnchor(g);g.Restore(state);
         }
-        void PaintFrozenAdornments(Graphics g)
-        {
-            PaintPolygonAnchors(g);if(box!=null)BoxLabel(g);if(hover!=null&&hover!=selected&&drag==Drag.None&&box==null)Outline(g,hover,false);if(selected!=null&&box==null){if(SelectionCount>1)OutlineGroup(g);else if(!EditingPath)Outline(g,selected,true);}if(PaintCaptureChrome!=null)PaintCaptureChrome(g);
-        }
         internal void PaintCaptureBackdrop(Graphics g)
         {
             if(captureScene==null){captureScene=new CaptureScene(Img,CaptureDim);SceneBuildCount++;}captureScene.Paint(g,Rectangle.Round(Crop));

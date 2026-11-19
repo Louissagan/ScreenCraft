@@ -1,70 +1,107 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Derived from Stackshot tools/Stackshot.wxs, MIT, rubenitx.
-     Per-user only. No process termination, elevation, automatic launch or startup opt-in. -->
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="$(var.ProductName)" Language="2052" Version="$(var.Version)" Manufacturer="ScreenCraft"
-           UpgradeCode="$(var.UpgradeCode)">
-    <Package InstallerVersion="500" Compressed="yes" InstallScope="perUser" InstallPrivileges="limited" Platform="x64"
-             Description="ScreenCraft 当前用户安装" />
-    <MajorUpgrade AllowSameVersionUpgrades="yes" Schedule="afterInstallInitialize"
-                  DowngradeErrorMessage="已安装更新版本，请先卸载新版或使用便携版。" />
-    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
-    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+  <Product Id="*" Name="$(var.ProductName)" Manufacturer="ScreenCraft" Language="2052"
+           Version="$(var.Version)" UpgradeCode="$(var.UpgradeCode)">
+    <Package Platform="x64" InstallerVersion="500" InstallScope="perUser" InstallPrivileges="limited"
+             Compressed="yes" Description="ScreenCraft 当前用户安装" />
+    <Media Id="1" Cabinet="ScreenCraft.cab" EmbedCab="yes" CompressionLevel="high" />
+    <Icon Id="ScreenCraftIcon" SourceFile="$(var.Icon)" />
+    <Property Id="ARPPRODUCTICON" Value="ScreenCraftIcon" />
+
+    <!-- Keep the registered paths when replacing an installed version. -->
+    <Property Id="INSTALLFOLDER" Secure="yes">
+      <RegistrySearch Id="RegisteredAppDirectory" Root="HKCU" Win64="yes"
+                      Key="$(var.RegistryKey)" Name="InstallPath" Type="raw" />
+    </Property>
+    <Property Id="USERMENUDIR" Secure="yes">
+      <RegistrySearch Id="RegisteredShortcutDirectory" Root="HKCU" Win64="yes"
+                      Key="$(var.RegistryKey)" Name="MenuPath" Type="raw" />
+    </Property>
+    <Property Id="WINDOWSMAJOR">
+      <RegistrySearch Id="ReadWindowsMajor" Root="HKLM" Win64="yes" Type="raw"
+                      Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentMajorVersionNumber" />
+    </Property>
+    <Property Id="FRAMEWORKRELEASE">
+      <RegistrySearch Id="ReadFrameworkRelease" Root="HKLM" Win64="yes" Type="raw"
+                      Key="SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" Name="Release" />
+    </Property>
+    <Upgrade Id="$(var.UpgradeCode)">
+      <UpgradeVersion Maximum="$(var.Version)" IncludeMaximum="yes" Property="SCREENCRAFT_REPLACE" />
+      <UpgradeVersion Minimum="$(var.Version)" IncludeMinimum="no" OnlyDetect="yes" Property="SCREENCRAFT_NEWER" />
+    </Upgrade>
+    <Condition Message="这个安装包仅适用于当前 Windows 用户。请移除 ALLUSERS 参数。">NOT ALLUSERS</Condition>
+    <Condition Message="需要 Windows 10 或更新的 64 位 Windows。">Installed OR (VersionNT64 AND WINDOWSMAJOR &gt;= "#10")</Condition>
+    <Condition Message="需要 .NET Framework 4.8。请通过 Windows 更新安装后重试。">Installed OR FRAMEWORKRELEASE &gt;= "#528040"</Condition>
+    <Condition Message="已安装更新版本。请保留已安装版本，或改用此版本的便携包。">Installed OR NOT SCREENCRAFT_NEWER</Condition>
+
     <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
-    <Property Id="REMOVEUSERDATA" Value="0" Secure="yes" />
     <Property Id="LAUNCHAPP" Value="0" Secure="yes" />
-    <Property Id="INSTALLFOLDER" Secure="yes"><RegistrySearch Id="ExistingInstallPath" Root="HKCU" Key="$(var.RegistryKey)" Name="InstallPath" Type="raw" Win64="yes" /></Property>
-    <Property Id="USERMENUDIR" Secure="yes"><RegistrySearch Id="ExistingMenuPath" Root="HKCU" Key="$(var.RegistryKey)" Name="MenuPath" Type="raw" Win64="yes" /></Property>
-    <Icon Id="AppIcon" SourceFile="$(var.Icon)" />
-    <Property Id="WINDOWSMAJOR"><RegistrySearch Id="WindowsMajor" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentMajorVersionNumber" Type="raw" Win64="yes" /></Property>
-    <Property Id="FRAMEWORKRELEASE"><RegistrySearch Id="FrameworkRelease" Root="HKLM" Key="SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" Name="Release" Type="raw" Win64="yes" /></Property>
-    <Condition Message="ScreenCraft 需要 64 位 Windows 10 或更高版本。">Installed OR (VersionNT64 AND WINDOWSMAJOR = "#10")</Condition>
-    <Condition Message="这台电脑缺少 .NET Framework 4.8。请先通过 Windows 的受支持更新方式补齐；安装程序不会下载或申请提权。">Installed OR FRAMEWORKRELEASE &gt;= "#528040"</Condition>
-    <Condition Message="安装包仅支持当前用户安装，请移除 ALLUSERS 参数。">NOT ALLUSERS</Condition>
-    <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="LocalAppDataFolder"><Directory Id="ProgramsDir" Name="Programs"><Directory Id="INSTALLFOLDER" Name="$(var.DirectoryName)" /></Directory></Directory>
-      <Directory Id="ProgramMenuFolder"><Directory Id="USERMENUDIR" Name="$(var.DirectoryName)" /></Directory>
-    </Directory>
-    <DirectoryRef Id="INSTALLFOLDER">
-      <Component Id="ApplicationFiles" Guid="$(var.MainGuid)" Win64="yes">
-        <RegistryValue Root="HKCU" Key="$(var.RegistryKey)" Name="InstalledVersion" Type="string" Value="[ProductVersion]" KeyPath="yes" />
-        <RegistryValue Root="HKCU" Key="$(var.RegistryKey)" Name="ProductCode" Type="string" Value="[ProductCode]" />
-        <RegistryValue Root="HKCU" Key="$(var.RegistryKey)" Name="InstallPath" Type="string" Value="[INSTALLFOLDER]" />
-        <RegistryValue Root="HKCU" Key="$(var.RegistryKey)" Name="MenuPath" Type="string" Value="[USERMENUDIR]" />
-        <File Id="AppExe" Source="$(var.Payload)\ScreenCraft.exe" KeyPath="no" Checksum="yes" />
-        <File Id="Config" Source="$(var.Payload)\ScreenCraft.exe.config" />
-        <File Id="License" Source="$(var.Root)\LICENSE" />
-        <File Id="Notices" Source="$(var.Root)\THIRD_PARTY_NOTICES.md" />
-        <File Id="ColorLicense" Source="$(var.Root)\src\Assets\COLORBREWER_LICENSE.txt" />
-        <File Id="WixLicense" Source="$(var.Root)\src\Assets\WIX_LICENSE.txt" />
-        <File Id="Guide" Source="$(var.Root)\docs\USER_GUIDE.md" />
-        <File Id="Limitations" Source="$(var.Root)\docs\KNOWN_LIMITATIONS.md" />
-        <RemoveFolder Id="RemoveApplicationFolder" On="uninstall" />
-        <RemoveFolder Id="RemoveProgramsFolderIfEmpty" Directory="ProgramsDir" On="uninstall" />
-      </Component>
-    </DirectoryRef>
-    <DirectoryRef Id="USERMENUDIR">
-      <Component Id="UserShortcut" Guid="$(var.ShortcutGuid)" Win64="yes">
-        <RegistryValue Root="HKCU" Key="$(var.RegistryKey)" Name="MenuShortcut" Type="integer" Value="1" KeyPath="yes" />
-        <Shortcut Id="AppShortcut" Name="ScreenCraft" Target="[#AppExe]" WorkingDirectory="INSTALLFOLDER" Description="截图、标注与独立贴图" />
-        <Shortcut Id="SettingsShortcut" Name="ScreenCraft 设置" Target="[#AppExe]" Arguments="--settings" WorkingDirectory="INSTALLFOLDER" />
-        <RemoveFolder Id="RemoveMenuFolder" On="uninstall" />
-      </Component>
-    </DirectoryRef>
-    <Feature Id="Main" Title="ScreenCraft" Level="1" Absent="disallow"><ComponentRef Id="ApplicationFiles" /><ComponentRef Id="UserShortcut" /></Feature>
-    <?ifndef IsolatedTest?>
-    <CustomAction Id="CloseInstalledInstance" FileKey="AppExe" ExeCommand="--installer-request-exit" Execute="deferred" Impersonate="yes" Return="check" />
-    <CustomAction Id="CleanupOwnedStartup" FileKey="AppExe" ExeCommand="--installer-cleanup" Execute="deferred" Impersonate="yes" Return="check" />
-    <CustomAction Id="CleanupOwnedCache" FileKey="AppExe" ExeCommand="--installer-clear-cache" Execute="deferred" Impersonate="yes" Return="check" />
-    <CustomAction Id="LaunchApp" FileKey="AppExe" ExeCommand="--background" Return="asyncNoWait" Impersonate="yes" />
+    <Property Id="REMOVEUSERDATA" Value="0" Secure="yes" />
     <InstallExecuteSequence>
-      <Custom Action="CloseInstalledInstance" Before="CleanupOwnedCache">REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
-      <Custom Action="CleanupOwnedStartup" Before="RemoveFiles">REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
-      <Custom Action="CleanupOwnedCache" Before="CleanupOwnedStartup">REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE AND REMOVEUSERDATA = "1"</Custom>
-      <Custom Action="LaunchApp" After="InstallFinalize">NOT REMOVE AND LAUNCHAPP = "1"</Custom>
+      <RemoveExistingProducts After="InstallInitialize">SCREENCRAFT_REPLACE</RemoveExistingProducts>
+      <?ifndef IsolatedTest?>
+      <Custom Action="CloseInstalledInstance" Sequence="3470">REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+      <Custom Action="CleanupOwnedCache" Sequence="3480">REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE AND REMOVEUSERDATA = "1"</Custom>
+      <Custom Action="CleanupOwnedStartup" Sequence="3490">REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+      <Custom Action="LaunchApp" After="InstallFinalize">LAUNCHAPP = "1" AND NOT REMOVE</Custom>
+      <?endif?>
     </InstallExecuteSequence>
+    <?ifndef IsolatedTest?>
+    <CustomAction Id="CloseInstalledInstance" FileKey="ScreenCraftProgram" ExeCommand="--installer-request-exit"
+                  Execute="deferred" Impersonate="yes" Return="check" />
+    <CustomAction Id="CleanupOwnedCache" FileKey="ScreenCraftProgram" ExeCommand="--installer-clear-cache"
+                  Execute="deferred" Impersonate="yes" Return="check" />
+    <CustomAction Id="CleanupOwnedStartup" FileKey="ScreenCraftProgram" ExeCommand="--installer-cleanup"
+                  Execute="deferred" Impersonate="yes" Return="check" />
+    <CustomAction Id="LaunchApp" FileKey="ScreenCraftProgram" ExeCommand="--background" Return="asyncNoWait" />
     <?endif?>
+    <Feature Id="Main" Title="ScreenCraft" Level="1" Absent="disallow">
+      <ComponentGroupRef Id="CurrentUserApplication" />
+    </Feature>
     <UIRef Id="WixUI_Minimal" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.Root)\tools\installer-license.rtf" />
   </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="ProgramsDir" Name="Programs">
+          <Directory Id="INSTALLFOLDER" Name="$(var.DirectoryName)" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="USERMENUDIR" Name="$(var.DirectoryName)" />
+      </Directory>
+    </Directory>
+    <!-- These two component GUIDs and registry key paths identify existing installations. -->
+    <ComponentGroup Id="CurrentUserApplication">
+      <Component Id="ScreenCraftFiles" Directory="INSTALLFOLDER" Win64="yes" Guid="$(var.MainGuid)">
+        <RegistryKey Root="HKCU" Key="$(var.RegistryKey)">
+          <RegistryValue Name="InstalledVersion" Value="[ProductVersion]" Type="string" KeyPath="yes" />
+          <RegistryValue Name="ProductCode" Value="[ProductCode]" Type="string" />
+          <RegistryValue Name="InstallPath" Value="[INSTALLFOLDER]" Type="string" />
+          <RegistryValue Name="MenuPath" Value="[USERMENUDIR]" Type="string" />
+        </RegistryKey>
+        <File Id="ScreenCraftProgram" Source="$(var.Payload)\ScreenCraft.exe" Checksum="yes" />
+        <File Source="$(var.Payload)\ScreenCraft.exe.config" />
+        <File Source="$(var.Root)\LICENSE" />
+        <File Source="$(var.Root)\THIRD_PARTY_NOTICES.md" />
+        <File Source="$(var.Root)\src\Assets\COLORBREWER_LICENSE.txt" />
+        <File Source="$(var.Root)\src\Assets\WIX_LICENSE.txt" />
+        <File Source="$(var.Root)\docs\USER_GUIDE.md" />
+        <File Source="$(var.Root)\docs\KNOWN_LIMITATIONS.md" />
+        <RemoveFolder Id="DeleteEmptyAppDirectory" On="uninstall" />
+        <RemoveFolder Id="DeleteEmptyProgramsDirectory" Directory="ProgramsDir" On="uninstall" />
+      </Component>
+      <Component Id="ScreenCraftLinks" Directory="USERMENUDIR" Win64="yes" Guid="$(var.ShortcutGuid)">
+        <RegistryValue Root="HKCU" Key="$(var.RegistryKey)" Name="MenuShortcut"
+                       Value="1" Type="integer" KeyPath="yes" />
+        <Shortcut Id="OpenScreenCraft" Name="ScreenCraft" WorkingDirectory="INSTALLFOLDER"
+                  Target="[#ScreenCraftProgram]" Description="截图、标注与独立贴图" />
+        <Shortcut Id="OpenScreenCraftSettings" Name="ScreenCraft 设置" WorkingDirectory="INSTALLFOLDER"
+                  Target="[#ScreenCraftProgram]" Arguments="--settings" />
+        <RemoveFolder Id="DeleteEmptyShortcutDirectory" On="uninstall" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
 </Wix>
