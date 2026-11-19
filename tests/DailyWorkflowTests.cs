@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal static class DailyWorkflowTests
     {
@@ -49,7 +49,7 @@ namespace Stackshot
             run("daily installer/cleanup removes only matching installed startup and owned cache",delegate{var entry=new FakeStartup();string executable=Path.Combine(output,"App","ScreenCraft.exe");entry.Value=StartupCommand.For(executable);InstallerCleanup.RemoveOwnedStartup(entry,executable);check(entry.Value==null&&entry.Removed==1,"own startup not removed");entry.Value=StartupCommand.For(Path.Combine(output,"Portable","ScreenCraft.exe"));InstallerCleanup.RemoveOwnedStartup(entry,executable);check(entry.Value!=null&&entry.Removed==1,"portable startup removed");});
             run("daily settings/seven styled pages save pin export workflow preferences through production controls",delegate{
                 Preferences saved=null;using(var settings=new SettingsDialog(new Preferences(),output,delegate(Preferences p){saved=p;return null;})){
-                    var initial=(PreferencesChoice)Find(settings,"默认标注工具");initial.SelectedIndex=6;((NumericUpDown)Find(settings,"新贴图透明度")).Value=65;((PreferencesSwitch)Find(settings,"反向缩放滚轮")).Checked=true;((PreferencesChoice)Find(settings,"完成后动作")).SelectedIndex=1;((TextBox)Find(settings,"保存文件名模板")).Text="建筑-{date}-{id}";((PreferencesSwitch)Find(settings,"保留截图历史")).Checked=true;
+                    var initial=(PreferencesChoice)Find(settings,"默认标注工具");initial.SelectedIndex=7;((NumericUpDown)Find(settings,"新贴图透明度")).Value=65;((PreferencesSwitch)Find(settings,"反向缩放滚轮")).Checked=true;((PreferencesChoice)Find(settings,"完成后动作")).SelectedIndex=1;((TextBox)Find(settings,"保存文件名模板")).Text="建筑-{date}-{id}";((PreferencesSwitch)Find(settings,"保留截图历史")).Checked=true;
                     foreach(var page in new[]{1,6})using(var image=settings.RenderSyntheticPreview(page))image.Save(Path.Combine(output,"daily-settings-"+page+"-offscreen.png"));
                     settings.SelectPage(6);foreach(Control control in settings.Controls)if(control is PreferencesButton&&control.Text=="保存并应用")typeof(Button).GetMethod("OnClick",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(control,new object[]{EventArgs.Empty});
                     check(saved!=null&&saved.InitialTool=="Callout"&&saved.PinOpacity==65&&saved.PinReverseWheel&&saved.CompleteAction=="copy-save"&&saved.HistoryEnabled,"settings controls lost");check(saved.Hotkeys().Count==10,"new hotkey actions absent");check(!settings.Visible,"settings shown");

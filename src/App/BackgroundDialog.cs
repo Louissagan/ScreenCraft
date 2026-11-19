@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal static class BackgroundStyle
     {
@@ -28,7 +28,7 @@ namespace Stackshot
         internal BackgroundDialog(Canvas target)
         {
             canvas=target;original=canvas.ExportDocument();var bg=original.Background;enabled.Checked=original.BackgroundOn;shadow.Checked=bg.BgShadow;kind.SelectedIndex=bg.BgKind==1?1:0;preset.SelectedIndex=Math.Max(0,Math.Min(11,bg.BgPreset));ratio.SelectedIndex=Math.Max(0,Array.IndexOf(new[]{"auto","16:9","4:3","1:1"},bg.BgRatio));padding.Value=bg.BgPadding;radius.Value=bg.BgRadius;border.Value=bg.BgInset;strength.Value=bg.BgShadowSize;color.Swatch=Color.FromArgb(255,(bg.BgColor>>16)&255,(bg.BgColor>>8)&255,bg.BgColor&255);
-            Text="ScreenCraft · 图片美化";Icon=ShotStack.AppIcon;Font=new Font("Microsoft YaHei UI",9);ClientSize=new Size(920,710);MinimumSize=new Size(780,660);StartPosition=FormStartPosition.CenterParent;BackColor=PreferencesLook.Background;DoubleBuffered=true;
+            Text="ScreenCraft · 图片美化";Icon=CaptureHost.AppIcon;Font=new Font("Microsoft YaHei UI",9);ClientSize=new Size(920,710);MinimumSize=new Size(780,660);StartPosition=FormStartPosition.CenterParent;BackColor=PreferencesLook.Background;DoubleBuffered=true;
             group.AddRow(new PreferencesRow("启用背景美化",enabled,42));group.AddRow(new PreferencesRow("背景类型",kind,180));group.AddRow(new PreferencesRow("渐变预设",preset,180));group.AddRow(new PreferencesRow("背景颜色",color,180));group.AddRow(new PreferencesRow("输出比例",ratio,180));group.AddRow(new PreferencesRow("边距",padding,180));group.AddRow(new PreferencesRow("圆角",radius,180));group.AddRow(new PreferencesRow("边框",border,180));group.AddRow(new PreferencesRow("阴影",shadow,42));group.AddRow(new PreferencesRow("阴影强度",strength,180));Controls.AddRange(new Control[]{group,preview,status,apply,cancel});
             EventHandler change=delegate{debounce.Stop();debounce.Start();};enabled.CheckedChanged+=change;shadow.CheckedChanged+=change;kind.SelectionChanged+=change;preset.SelectionChanged+=change;ratio.SelectionChanged+=change;padding.ValueChanged+=change;radius.ValueChanged+=change;border.ValueChanged+=change;strength.ValueChanged+=change;debounce.Tick+=delegate{debounce.Stop();RefreshPreview();};
             color.Click+=delegate{CraftColors.Show(color,color.Swatch,delegate(Color chosen){color.Swatch=chosen;color.Invalidate();RefreshPreview();});};

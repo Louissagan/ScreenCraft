@@ -1,16 +1,16 @@
-// ScreenCraft extensions to the MIT Stackshot Shape/Painter model.
+﻿// ScreenCraft annotation styles shared by preview and export.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
-namespace Stackshot
+namespace ScreenCraft
 {
     public partial class Shape
     {
         public string Id = Guid.NewGuid().ToString("N");
         public float CornerRadius;
-        public bool FillEnabled;
+        public bool FillEnabled,HatchedFill,TransparentText;
         public Color FillColor = Color.FromArgb(60, 255, 210, 0);
         public DashStyle Dash = DashStyle.Solid;
         public bool SimpleArrow;
@@ -61,7 +61,7 @@ namespace Stackshot
             SizeF size=measure.MeasureString(text,TextFont(font),new SizeF(width-16,10000));
             float x=s.Kind==Tool.Cloud?s.Box.Right:s.Kind==Tool.Counter&&s.LeaderCounter?s.B.X:s.A.X;
             float y=s.Kind==Tool.Cloud?s.Box.Top:s.Kind==Tool.Counter&&s.LeaderCounter?s.B.Y:s.A.Y;
-            return new RectangleF(x+s.NoteOffset.X,y+s.NoteOffset.Y,width,Math.Max(s.NoteHeight,Math.Max(font+16,size.Height+16)));
+            return new RectangleF(x+s.NoteOffset.X,y+s.NoteOffset.Y,width,Math.Max(s.NoteAutoWidth?0:s.NoteHeight,Math.Max(font+16,size.Height+16)));
         }
 
         static Pen StyledPen(Shape s)
@@ -88,7 +88,7 @@ namespace Stackshot
                     using(var pen=StyledPen(s))
                     {
                         if(s.Kind==Tool.Ellipse) path.AddEllipse(s.Box);
-                        if(s.FillEnabled) using(var fill=new SolidBrush(s.FillColor))g.FillPath(fill,path);
+                        if(s.FillEnabled)FillShape(g,s,path,s.FillColor);
                         g.DrawPath(pen,path);
                     }
                 }
@@ -106,9 +106,9 @@ namespace Stackshot
                 else if(s.Kind==Tool.Text)
                 {
                     var box=TextBounds(s); float pad=8;
-                    using(var path=Theme.Round(box,6))using(var fill=new SolidBrush(LabelColor(s)))g.FillPath(fill,path);
+                    if(!s.TransparentText)using(var path=Theme.Round(box,6))using(var fill=new SolidBrush(LabelColor(s)))g.FillPath(fill,path);
                     g.TextRenderingHint=TextRenderingHint.AntiAliasGridFit;
-                    using(var ink=new SolidBrush(Color.White)){if(s.TextWrap)g.DrawString(s.Text??"",TextFont(s.FontPx),ink,RectangleF.Inflate(box,-pad,-pad));else g.DrawString(s.Text??"",TextFont(s.FontPx),ink,s.A.X+pad,s.A.Y+pad,TextFmt);}
+                    using(var ink=new SolidBrush(TextInk(s))){if(s.TextWrap)g.DrawString(s.Text??"",TextFont(s.FontPx),ink,RectangleF.Inflate(box,-pad,-pad));else g.DrawString(s.Text??"",TextFont(s.FontPx),ink,s.A.X+pad,s.A.Y+pad,TextFmt);}
                 }
                 else if(s.Kind==Tool.Callout){if(!string.IsNullOrEmpty(s.Text))DrawPointLeader(g,s,NoteBounds(s));else using(var ink=new SolidBrush(s.Color)){float d=MarkerDiameter(s);g.FillEllipse(ink,s.A.X-d/2,s.A.Y-d/2,d,d);}}
                 else if(s.Kind==Tool.Counter&&s.LeaderCounter){DrawCounterLeader(g,s);}
@@ -128,6 +128,12 @@ namespace Stackshot
             finally {g.Restore(state);}
         }
 
+        static void FillShape(Graphics g,Shape s,GraphicsPath path,Color fill)
+        {
+            if(!s.HatchedFill){using(var brush=new SolidBrush(fill))g.FillPath(brush,path);return;}
+            DrawPattern(g,s,path,fill);
+        }
+
         static void DrawNote(Graphics g,Shape s)
         {
             var box=NoteBounds(s); var origin=s.Kind==Tool.Cloud?new PointF(s.Box.Right,s.Box.Top+s.Box.Height/2):s.Kind==Tool.Counter&&s.LeaderCounter?s.B:s.A;
@@ -141,7 +147,8 @@ namespace Stackshot
         }
         public static float NoteFont(Shape s){return Math.Max(8,s.NoteFontPx>0?s.NoteFontPx:s.FontPx);}
         public static Color NoteInk(Shape s){return Color.White;}
-        public static Color LabelColor(Shape s){return s.Kind==Tool.Text&&s.FillEnabled?Color.FromArgb(255,s.FillColor):Color.FromArgb(255,s.Color);}
+        internal static Color TextInk(Shape s){return s.TransparentText?Color.FromArgb(255,s.Color):Color.White;}
+        public static Color LabelColor(Shape s){return s.Kind==Tool.Text&&s.FillEnabled&&!s.TransparentText?Color.FromArgb(255,s.FillColor):Color.FromArgb(255,s.Color);}
         public static float MarkerDiameter(Shape s){return s.MarkerSize>0?s.MarkerSize:s.Kind==Tool.Counter?s.FontPx*1.6f:12;}
         public static float LeaderWidth(Shape s){return s.Kind==Tool.Cloud?Math.Max(1,s.Width/2):Math.Max(1,MarkerDiameter(s)/12);}
     }

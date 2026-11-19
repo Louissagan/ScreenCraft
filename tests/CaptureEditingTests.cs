@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     static class CaptureEditingTests
     {
@@ -22,6 +22,42 @@ namespace Stackshot
             run("capture scene/native canvas repaint keeps one cache and overwrites dirty pixels after moves",delegate{using(var overlay=Overlay()){var c=overlay.AnnotationCanvas;for(int i=0;i<20;i++){c.SetCaptureSelection(new Rectangle(20+i*8,20+i*6,500,320),false);using(var a=UiPaintingTests.NativePaint(c,Color.Magenta))using(var b=UiPaintingTests.NativePaint(c,Color.Lime)){check(Hash(a)==Hash(b),"native scene depends on previous pixels");if(i==19)a.Save(Path.Combine(output,"capture-scene-native-final.png"));}}check(c.SceneBuildCount==1,"dim layer rebuilt during crop moves");check(!overlay.Visible,"native repaint showed overlay");}});
             run("capture style/radius slider updates selected rounded rectangle with arbitrary radius",delegate{using(var overlay=Overlay()){var c=overlay.AnnotationCanvas;var s=ScreenCraftTests.Mark(Tool.Rect,150,120,450,350);s.CornerRadius=12;c.AddAnnotation(s);var slider=Children(overlay).OfType<CaptureSlider>().Single(x=>x.AccessibleName=="圆角半径快捷调整");slider.Value=57;check(c.SelectedShape.CornerRadius==57,"radius preset still fixed at twelve");using(var image=c.Render())image.Save(Path.Combine(output,"arbitrary-radius-offscreen.png"));}});
             run("text/live plain text edits font foreground and background without committing or losing content",delegate{using(var c=new Canvas(Source())){var s=ScreenCraftTests.Mark(Tool.Text,100,100,100,100);s.Text="before";c.AddAnnotation(s);c.EditNote();var box=c.Controls.OfType<TextBox>().Single();box.Text="建筑 after";c.SetTextSize(48);c.ApplyTextPreset(true);check(c.Typing&&Math.Abs(box.Font.Size-48)<1&&box.Text=="建筑 after"&&box.ForeColor.ToArgb()==Color.White.ToArgb(),"live controls blocked or text lost");typeof(Control).GetMethod("OnLostFocus",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(box,new object[]{EventArgs.Empty});check(c.Typing,"style focus ended edit");c.CommitText();check(c.SelectedShape.Text=="建筑 after"&&c.SelectedShape.FillEnabled&&c.SelectedShape.FontPx==48,"live text not persisted");}});
+            run("text/style icons update active text and preserve both modes through edits and export",delegate{
+                using(var overlay=Overlay()){
+                    var canvas=overlay.AnnotationCanvas;
+                    var icons=Children(overlay).OfType<CaptureIconButton>().ToArray();
+                    var plain=icons.Single(b=>b.AccessibleName=="彩色字 · 透明底");
+                    var block=icons.Single(b=>b.AccessibleName=="白字 · 彩色底");
+                    check(!overlay.IsOptionShown(plain)&&!overlay.IsOptionShown(block),"text choices shown for unrelated tool");
+                    canvas.SetTool(Tool.Text);
+                    check(overlay.IsOptionShown(plain)&&overlay.IsOptionShown(block)&&plain.Selected,"text did not default to transparent");
+                    var mark=ScreenCraftTests.Mark(Tool.Text,150,120,150,120);
+                    mark.Text="建筑";mark.Color=Color.Red;
+                    canvas.AddAnnotation(mark);canvas.EditNote();
+                    var input=Children(canvas).OfType<AnnotationTextInput>().Single();
+                    check(block.Selected&&!input.UseSceneBackdrop&&input.ForeColor==Color.White,"old label style was not preserved");
+                    Click(plain);
+                    check(plain.Selected&&canvas.Typing&&input.Text=="建筑"&&input.UseSceneBackdrop&&input.ForeColor.ToArgb()==Color.Red.ToArgb(),"transparent style did not update the live editor");
+                    canvas.SetColor(Color.Blue);
+                    check(input.ForeColor.ToArgb()==Color.Blue.ToArgb()&&input.UseSceneBackdrop,"changing color re-enabled the fill");
+                    Click(block);check(canvas.Typing&&input.ForeColor==Color.White&&!input.UseSceneBackdrop,"color block did not update the live editor");
+                    Click(plain);canvas.CommitText();
+                    var area=Rectangle.Ceiling(Painter.TextBounds(canvas.SelectedShape));
+                    using(var ink=canvas.RenderMarks(area)){
+                        check(ink.GetPixel(4,ink.Height/2).A==0,"transparent text exported a background");
+                        int blue=0;for(int y=0;y<ink.Height;y++)for(int x=0;x<ink.Width;x++){var c=ink.GetPixel(x,y);if(c.A>120&&c.B>180&&c.R<70)blue++;}
+                        check(blue>20,"transparent mode did not export colored glyphs");
+                    }
+                    using(var project=canvas.ExportDocument()){
+                        string path=Path.Combine(output,"text-modes.sccraft");project.Save(path);
+                        using(var reopened=AnnotationDocument.Open(path))using(var a=project.Render())using(var b=reopened.Render())
+                            check(reopened.Shapes.Single().TransparentText&&Hash(a)==Hash(b),"reopen lost transparent text");
+                    }
+                    canvas.Undo();
+                    using(var filled=canvas.RenderMarks(area))
+                        check(!canvas.SelectedShape.TransparentText&&filled.GetPixel(4,filled.Height/2).ToArgb()==Color.Blue.ToArgb(),"undo did not restore the colored background");
+                }
+            });
             run("notes/fixed white glyphs and accent background keep typography separate from marker size",delegate{using(var c=new Canvas(Source())){c.SetTool(Tool.Counter);var markerSize=c.DefaultStyle.MarkerSize;c.ApplyTextPreset(true);c.SetTextSize(36);c.SetTextColor(Color.Teal);check(c.Color.ToArgb()==Color.Teal.ToArgb()&&c.DefaultStyle.MarkerSize==markerSize&&c.DefaultStyle.NoteFontPx==36&&c.ActiveTextColor.ToArgb()==Color.White.ToArgb(),"one-color label defaults broken");var s=ScreenCraftTests.Mark(Tool.Counter,100,130,100,130);s.Color=Color.Teal;s.Text="建筑";s.NoteOffset=new PointF(80,-20);s.NoteWidth=240;c.AddAnnotation(s);var box=Painter.NoteBounds(c.SelectedShape);using(var filled=c.Render()){filled.Save(Path.Combine(output,"note-color-presets-offscreen.png"));check(filled.GetPixel((int)box.Right-8,(int)box.Top+10).ToArgb()==Color.Teal.ToArgb(),"note background is not annotation color");}c.ApplyTextPreset(false);c.SetTextSize(36);check(Painter.NoteInk(c.SelectedShape).ToArgb()==Color.White.ToArgb()&&c.SelectedShape.FontPx==s.FontPx&&c.SelectedShape.NoteFontPx==36,"legacy preset changed fixed white glyphs or marker size");}});
             run("notes/live callout font remains adjustable and no default white editor fill",delegate{using(var c=new Canvas(Source())){var s=ScreenCraftTests.Mark(Tool.Counter,100,130,100,130);s.Text="original";s.NoteOffset=new PointF(80,-20);c.AddAnnotation(s);c.EditNote();var box=c.Controls.OfType<TextBox>().Single();box.Text="说明可继续输入";c.SetTextSize(52);c.SetTextColor(Color.Yellow);check(c.Typing&&box.Font.Size==52&&box.ForeColor.ToArgb()==Color.White.ToArgb()&&box.BackColor.ToArgb()==Color.Yellow.ToArgb(),"callout editor did not update");c.CommitText();check(c.SelectedShape.NoteFontPx==52&&c.SelectedShape.FontPx==s.FontPx&&c.SelectedShape.Text=="说明可继续输入","callout edit changed circle or dropped text");}});
             run("notes/production drag moves note and anchor independently and undo restores",delegate{using(var owner=new Form{ClientSize=new Size(1000,700)})using(var c=new Input(Source())){owner.Controls.Add(c);c.Bounds=owner.ClientRectangle;var s=ScreenCraftTests.Mark(Tool.Counter,150,170,150,170);s.Text="separate note";s.NoteOffset=new PointF(120,20);c.AddAnnotation(s);var before=c.SelectedShape.A;var box=Painter.NoteBounds(c.SelectedShape);c.Drag(new PointF(box.Left+30,box.Top+15),new PointF(box.Left+70,box.Top+45));check(c.SelectedShape.A==before&&Math.Abs(c.SelectedShape.NoteOffset.X-160)<2,"note drag moved anchor");var note=Painter.NoteBounds(c.SelectedShape).Location;c.Drag(before,new PointF(before.X+45,before.Y+30));check(c.SelectedShape.A.X>before.X+40&&Math.Abs(Painter.NoteBounds(c.SelectedShape).X-note.X)<2&&Math.Abs(Painter.NoteBounds(c.SelectedShape).Y-note.Y)<2,"anchor drag moved note");c.Undo();check(c.AnnotationSnapshot.Single().A==before,"anchor undo");check(!owner.Visible,"drag test showed window");}});

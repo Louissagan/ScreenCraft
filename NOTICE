@@ -1,9 +1,8 @@
-ScreenCraft
+﻿ScreenCraft
 Copyright (c) 2026 Louissagan and ScreenCraft contributors.
 
-Includes source derived from Stackshot.
-Copyright (c) 2026 Rubén Martínez (@rubenitx).
-The original copyright and full MIT license are retained in
-src/Upstream/Stackshot/LICENSE and THIRD_PARTY_NOTICES.md.
-
-Additional license texts are provided in src/Assets and THIRD_PARTY_NOTICES.md.
+Versions through 0.9.4 included Stackshot runtime source. Version 0.10 replaces
+those 27 C# modules. Historical attribution and the derived installer template
+retain Copyright (c) 2026 Rubén Martínez (@rubenitx), MIT License.
+The full original license is preserved in src/Upstream/Stackshot/LICENSE and
+THIRD_PARTY_NOTICES.md. Additional historical/tooling licenses are in src/Assets.

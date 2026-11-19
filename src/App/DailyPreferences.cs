@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Web.Script.Serialization;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed partial class Preferences
     {
@@ -17,7 +17,7 @@ namespace Stackshot
         public int HistoryLimit=100;
         public string ValidateDaily()
         {
-            if(Array.IndexOf(new[]{"Rect","Ellipse","Line","Arrow","Pen","Text","Callout","Counter","Cloud","Pixelate","Redact","Crop"},InitialTool)<0)return "默认标注工具无效。";
+            if(Array.IndexOf(new[]{"Rect","Ellipse","Line","Arrow","Pen","PenPath","Text","Callout","Counter","Cloud","Pixelate","Redact","Crop"},InitialTool)<0)return "默认标注工具无效。";
             if(PinOpacity<20||PinOpacity>100||PinZoomPercent<0||PinZoomPercent>400||PinBorderWidth<0||PinBorderWidth>8||PinRadius<0||PinRadius>60)return "贴图透明度、缩放或边框参数超出范围。";
             System.Drawing.Color color;if(!AnnotationPalette.TryHex(PinBorderColor,out color))return "贴图边框颜色应为 #RRGGBB。";
             if(Array.IndexOf(new[]{"copy","copy-save","save"},CompleteAction)<0)return "完成后动作无效。";

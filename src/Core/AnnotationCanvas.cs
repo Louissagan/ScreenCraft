@@ -1,0 +1,431 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace ScreenCraft
+{
+    // The control is a view/controller over image-coordinate marks. A gesture has
+    // exactly one pre-state and commits at most one history entry; mouse-up is input.
+    public partial class Canvas : Control
+    {
+        sealed class Snapshot { internal List<Shape> Shapes;internal RectangleF Crop;internal Settings Background;internal bool BackgroundOn;internal float OutputCornerRadius;internal object Extra; }
+        enum Drag { None,PickOrDraw,Draw,Move,Resize,Rotate }
+        public Func<object> SaveExtra;public Action<object> LoadExtra;
+        public static readonly float[] Weights={.6f,1,1.6f};
+        public static bool PaintUnderCard;
+        public Bitmap Img{get;private set;}
+        public float Ui=1;
+        public Tool Tool=Tool.Rect;
+        public Color Color=AnnotationColors.Default;
+        public int Weight=1;
+        public RectangleF Crop;
+        public Settings Bg;
+        public bool BgOn,Video;
+        public bool Live{get;set;}
+        public event EventHandler Changed,StateChanged;
+        public event Action DrawStart;
+        List<Shape> shapes=new List<Shape>();
+        readonly List<Snapshot> undo=new List<Snapshot>(),redo=new List<Snapshot>();
+        Shape cur,selected,hover,orig,editing,nudged,pendingPick;
+        Drag drag;
+        int handle,version,nudgedAt;
+        bool movingNote,panning,spacePan;
+        PointF dragFrom,grab,off,pan,panStart;
+        Point panFrom,pendingPickAt;
+        Point lastPointer;
+        RectangleF backdropViewport;
+        MouseButtons panButton;
+        float k=1,zoom=1;
+        AnnotationTextInput box;Font inputFont;
+        Rectangle lastInputBounds;
+        PointF boxAt;
+        Snapshot gestureBefore;
+        Snapshot[] gestureRedo;
+        bool gestureCommitted;
+        Backdrop.ShotInfo backdropInfo;
+        Bitmap playFrame;
+
+        public Canvas(Bitmap image)
+        {
+            if(image==null)throw new ArgumentNullException("image");
+            Img=image;Crop=new RectangleF(PointF.Empty,image.Size);
+            SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Selectable,true);
+            BackColor=PreferencesLook.Background;TabStop=true;
+        }
+        public bool Typing{get{return box!=null;}}
+        public bool HasSelection{get{return selected!=null;}}
+        public bool Busy{get{return polygonDrawing||pathDragging||drag!=Drag.None||panning||sampledColor!=null;}}
+        public bool CanUndo{get{return polygonDrawing||undo.Count!=0||Typing;}}
+        public bool CanRedo{get{return polygonDrawing?polygonRedo.Count!=0:redo.Count!=0&&!Typing;}}
+        public bool IsCropped{get{return Crop!=new RectangleF(PointF.Empty,Img.Size);}}
+        public bool HasMarks{get{return shapes.Count!=0;}}
+        public Color ActiveColor{get{return selected==null?Color:selected.Kind==Tool.Text?Painter.LabelColor(selected):selected.Color;}}
+        public Tool ActiveKind{get{return selected==null?Tool:selected.Polygon?Tool.PenPath:selected.Kind;}}
+        public int ActiveWeight{get{return selected==null?Weight:selected.Weight;}}
+        public Rectangle CropRect{get{return Rectangle.Round(Crop);}}
+        Size OutputSizeRaw{get{return new Size(Math.Max(1,(int)Math.Round(Crop.Width)),Math.Max(1,(int)Math.Round(Crop.Height)));}}
+        public Size OutputSize{get{if(!BgOn||Bg==null)return OutputSizeRaw;Size size;Rectangle inner,card;var info=Info();Backdrop.Measure(OutputSizeRaw,Bg,false,info==null?Padding.Empty:info.Inset,out size,out card,out inner);return size;}}
+        int Pu(float value){return Math.Max(1,(int)Math.Round(value*Ui));}
+        float StrokeFor(int weight){return 3*Weights[Math.Max(0,Math.Min(2,weight))];}
+        float FontFor(int weight){return 22*(.7f+.3f*Math.Max(0,Math.Min(2,weight)));}
+        void Fire(EventHandler handler){if(handler!=null)handler(this,EventArgs.Empty);}
+        void NotifyEdit(){Fire(Changed);Fire(StateChanged);Invalidate();}
+        Backdrop.ShotInfo Info(){if(Video||Bg==null)return null;var next=Backdrop.Study(Img,CropRect,Bg,backdropInfo);if(backdropInfo!=null&&next!=backdropInfo)backdropInfo.Dispose();return backdropInfo=next;}
+        public Bitmap BlurThumb(){var info=Info();return info==null?null:Backdrop.BlurOf(info,Img,CropRect);}
+        public void BackdropChanged(){Rescaled();Invalidate();}
+
+        void Fit()
+        {
+            if(InPlaceViewport){k=1;off=PointF.Empty;return;}
+            if(ClientSize.Width<2||ClientSize.Height<2){k=1;off=PointF.Empty;return;}
+            if(BgOn&&Bg!=null){
+                Size frame;Rectangle card,inner;var info=Info();Backdrop.Measure(OutputSizeRaw,Bg,false,info==null?Padding.Empty:info.Inset,out frame,out card,out inner);
+                float fitFrame=Math.Min(Math.Max(1,Width-48)/(float)frame.Width,Math.Max(1,Height-48)/(float)frame.Height);k=Math.Max(.001f,fitFrame*zoom);
+                backdropViewport=new RectangleF((Width-frame.Width*k)/2+pan.X,(Height-frame.Height*k)/2+pan.Y,frame.Width*k,frame.Height*k);
+                off=new PointF(backdropViewport.X+(inner.X-Crop.X)*k,backdropViewport.Y+(inner.Y-Crop.Y)*k);return;
+            }
+            float fit=Math.Min(Math.Max(1,ClientSize.Width-48)/(float)Img.Width,Math.Max(1,ClientSize.Height-48)/(float)Img.Height);
+            k=Math.Max(.001f,fit*zoom);off=new PointF((ClientSize.Width-Img.Width*k)*.5f+pan.X,(ClientSize.Height-Img.Height*k)*.5f+pan.Y);
+        }
+        Point ToScreen(PointF point){return new Point((int)Math.Round(off.X+point.X*k),(int)Math.Round(off.Y+point.Y*k));}
+        PointF ToImg(Point point,bool clamp){float x=(point.X-off.X)/k,y=(point.Y-off.Y)/k;if(clamp){x=Math.Max(0,Math.Min(Img.Width,x));y=Math.Max(0,Math.Min(Img.Height,y));}return new PointF(x,y);}
+        Rectangle ScreenRect(RectangleF rectangle){var a=ToScreen(rectangle.Location);var b=ToScreen(new PointF(rectangle.Right,rectangle.Bottom));return Rectangle.FromLTRB(a.X,a.Y,b.X,b.Y);}
+        public void Rescaled(){Fit();if(box!=null)box.RefreshBackdrop();PlaceBox();Invalidate();}
+        public int ZoomPercent{get{Fit();return (int)Math.Round(k*100);}}
+        public bool Zoomed{get{return Math.Abs(zoom-1)>.001||pan!=PointF.Empty;}}
+        public void ZoomAt(Point point,float factor)
+        {
+            if(InPlaceViewport||factor<=0||float.IsNaN(factor)||float.IsInfinity(factor))return;
+            Fit();PointF anchor=ToImg(point,false);zoom=Math.Max(.05f,Math.Min(32,zoom*factor));Fit();pan.X+=point.X-(off.X+anchor.X*k);pan.Y+=point.Y-(off.Y+anchor.Y*k);Rescaled();
+        }
+        public void ZoomBy(float factor){ZoomAt(new Point(ClientSize.Width/2,ClientSize.Height/2),factor);}
+        public void ZoomFit(){zoom=1;pan=PointF.Empty;Rescaled();}
+        public void ZoomActual(){Fit();zoom/=k;pan=PointF.Empty;Rescaled();}
+        protected override void OnMouseWheel(MouseEventArgs e){if(!InPlaceViewport&&!Busy)ZoomAt(e.Location,e.Delta>0?1.2f:1/1.2f);base.OnMouseWheel(e);}
+        protected override void OnSizeChanged(EventArgs e){base.OnSizeChanged(e);if(Img!=null)Rescaled();}
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if(released||Img==null)return;
+            Fit();PaintScene(e.Graphics);
+            if(FullCaptureSurface)PaintFrozenAdornments(e.Graphics);else PaintAdornments(e.Graphics);
+        }
+        void PaintScene(Graphics g)
+        {
+            if(FullCaptureSurface){PaintFrozenContent(g);return;}
+            if(BgOn&&Bg!=null){using(var output=RenderContent(true))g.DrawImage(output,backdropViewport);return;}
+            var state=g.Save();try{
+                g.TranslateTransform(off.X,off.Y);g.ScaleTransform(k,k);g.InterpolationMode=k==1?InterpolationMode.NearestNeighbor:InterpolationMode.HighQualityBicubic;g.PixelOffsetMode=PixelOffsetMode.Half;g.DrawImage(playFrame??Img,new RectangleF(PointF.Empty,Img.Size));
+                using(var outside=new Region(new Rectangle(Point.Empty,Img.Size))){outside.Exclude(Crop);using(var dim=new SolidBrush(System.Drawing.Color.FromArgb(135,0,0,0)))g.FillRegion(dim,outside);}
+                g.SetClip(Crop,CombineMode.Intersect);Painter.DrawMarks(g,shapes,cur!=null&&cur.Kind!=Tool.Crop?cur:null,editing,Img,Crop);PaintEditingAnchor(g);
+            }finally{g.Restore(state);}
+        }
+        protected override void WndProc(ref Message message)
+        {
+            const int editColor=0x0133;
+            if(message.Msg==editColor&&box!=null&&box.UseSceneBackdrop&&box.IsHandleCreated&&box.Handle==message.LParam&&!released){
+                var area=Rectangle.Intersect(box.Bounds,ClientRectangle);
+                IntPtr brush=box.PaintOverScene(message.WParam,area,version,RenderInputBackdrop);
+                if(brush!=IntPtr.Zero){message.Result=brush;return;}
+            }
+            base.WndProc(ref message);
+        }
+        Bitmap RenderInputBackdrop(Rectangle area)
+        {
+            var result=new Bitmap(area.Width,area.Height,PixelFormat.Format24bppRgb);
+            try{
+                using(var g=Graphics.FromImage(result)){g.Clear(BackColor);g.TranslateTransform(-area.X,-area.Y);PaintScene(g);}
+                return result;
+            }catch{result.Dispose();throw;}
+        }
+        void PaintAdornments(Graphics g)
+        {
+            PaintPolygonAnchors(g);
+            if(cur!=null&&cur.Kind==Tool.Crop){using(var pen=new Pen(CaptureLook.Blue,1))g.DrawRectangle(pen,ScreenRect(cur.Box));}
+            if(hover!=null&&hover!=selected&&!Busy)Outline(g,hover,false);
+            if(selected!=null&&!Typing){if(SelectionCount>1)OutlineGroup(g);else if(!EditingPath)Outline(g,selected,true);}
+            if(Typing)BoxLabel(g);
+        }
+        RectangleF HandleBounds(Shape shape)
+        {
+            if(SelectionCount>1)return GroupBounds();
+            if(Painter.HasNote(shape.Kind)&&movingNote&&!string.IsNullOrEmpty(shape.Text))return Painter.NoteBounds(shape);
+            if(shape.Kind==Tool.Text)return Painter.TextBounds(shape);
+            if(shape.Kind==Tool.Counter)return shape.LeaderCounter?Painter.CounterBadge(shape):new RectangleF(shape.A.X-Painter.CounterRadius(shape),shape.A.Y-Painter.CounterRadius(shape),Painter.CounterRadius(shape)*2,Painter.CounterRadius(shape)*2);
+            return shape.Kind==Tool.Callout?Painter.LocalBounds(shape):shape.Box;
+        }
+        PointF[] Handles(Shape shape){return SelectionCount<=1&&Shape.IsLinear(shape.Kind)?new[]{shape.A,shape.B,shape.Mid}:BoxHandles(HandleBounds(shape));}
+        Point[] ScreenHandles(Shape shape){return Handles(shape).Select(p=>ToScreen(SelectionCount>1?p:Painter.WorldPoint(shape,p))).ToArray();}
+        int HandleAt(Point point){if(selected==null||Typing)return -1;var handles=ScreenHandles(selected);for(int i=0;i<handles.Length;i++)if(Math.Abs(handles[i].X-point.X)<=Pu(6)&&Math.Abs(handles[i].Y-point.Y)<=Pu(6))return i;return -1;}
+        void Outline(Graphics g,Shape shape,bool strong)
+        {
+            Color accent=strong?CaptureLook.Blue:System.Drawing.Color.FromArgb(120,CaptureLook.Blue);
+            using(var pen=new Pen(accent,1)){pen.DashStyle=DashStyle.Dash;if(!Shape.IsLinear(shape.Kind)||SelectionCount>1)g.DrawPolygon(pen,AdornmentCorners(shape).Select(ToScreen).ToArray());}
+            if(strong){foreach(var point in ScreenHandles(shape))SelectionAppearance.PaintHandle(g,new Rectangle(point.X-Pu(3),point.Y-Pu(3),Pu(6),Pu(6)));PaintRotationControl(g,shape);}
+        }
+        static float SegmentDistance(PointF point,PointF start,PointF end)
+        {
+            double dx=end.X-start.X,dy=end.Y-start.Y,den=dx*dx+dy*dy,t=den<1e-12?0:Math.Max(0,Math.Min(1,((point.X-start.X)*dx+(point.Y-start.Y)*dy)/den));
+            return (float)Math.Sqrt(Math.Pow(point.X-start.X-t*dx,2)+Math.Pow(point.Y-start.Y-t*dy,2));
+        }
+        bool Hit(Shape shape,PointF point,float tolerance)
+        {
+            point=Painter.LocalPoint(shape,point);
+            if(Painter.HasNote(shape.Kind)&&!string.IsNullOrEmpty(shape.Text)&&LeaderHit(point,shape.A,Painter.NoteBounds(shape),tolerance))return true;
+            if(shape.Kind==Tool.Text)return Painter.TextBounds(shape).Contains(point);
+            if(shape.Kind==Tool.Counter||shape.Kind==Tool.Callout)return Painter.LocalBounds(shape).Contains(point);
+            if(shape.Kind==Tool.Pen){using(var path=Painter.FreehandPath(shape))using(var pen=new Pen(System.Drawing.Color.Black,Math.Max(1,2*tolerance+shape.MaximumPathWidth))){return path.PointCount==0?SegmentDistance(point,shape.A,shape.A)<=tolerance+shape.Width:path.IsOutlineVisible(point,pen)||(shape.ClosedPen&&(shape.FillEnabled||shape.Polygon&&Tool==Tool.PenPath)&&path.IsVisible(point));}}
+            if(Shape.IsLinear(shape.Kind)){var points=shape.Kind==Tool.Pen?(shape.Points??new List<PointF>()).ToArray():shape.Curve(shape.Curved?48:1);for(int i=1;i<points.Length;i++)if(SegmentDistance(point,points[i-1],points[i])<=tolerance+shape.Width)return true;return false;}
+            var b=shape.Box;b.Inflate(tolerance,tolerance);if(!b.Contains(point))return false;
+            if(shape.Kind!=Tool.Spotlight&&(shape.FillEnabled||shape.Kind==Tool.Highlight||shape.Kind==Tool.Redact||shape.Kind==Tool.Pixelate||shape.Kind==Tool.Watermark))return true;
+            if(shape.Kind==Tool.Ellipse){double rx=shape.Box.Width/2,ry=shape.Box.Height/2;if(rx<.01||ry<.01)return false;double d=Math.Sqrt(Math.Pow((point.X-shape.Box.Left-rx)/rx,2)+Math.Pow((point.Y-shape.Box.Top-ry)/ry,2));return Math.Abs(d-1)<=tolerance/Math.Min(rx,ry);}
+            b=shape.Box;b.Inflate(-tolerance,-tolerance);return !b.Contains(point);
+        }
+        bool OnActiveLayer(Shape shape){return shape!=null&&(shape.Kind==Tool.Spotlight)==(Tool==Tool.Spotlight);}
+        bool ForceDrawing{get{return (InputModifiers&(Keys.Alt|Keys.Control))==Keys.Alt;}}
+        bool DrawsByDragging{get{return Tool!=Tool.Text&&Tool!=Tool.Callout&&Tool!=Tool.Counter&&Tool!=Tool.PenPath&&(Tool!=Tool.Pen||!DefaultStyle.ClosedPen);}}
+        Shape ShapeAt(Point point)
+        {
+            if(Tool==Tool.Crop||ForceDrawing)return null;
+            var imagePoint=ToImg(point,false);
+            for(int i=shapes.Count-1;i>=0;i--)
+                if(OnActiveLayer(shapes[i])&&(Tool!=Tool.PenPath||shapes[i].Polygon)&&Hit(shapes[i],imagePoint,Pu(5)/k))return shapes[i];
+            return null;
+        }
+        void UpdateHover(Point point)
+        {
+            var next=ShapeAt(point);
+            if(next!=hover){hover=next;Invalidate();}
+            Cursor=CanUseSelectionControls&&RotationAt(point)?Cursors.Hand:CanUseSelectionControls&&HandleAt(point)>=0?Cursors.SizeNWSE:
+                next!=null&&(!DrawsByDragging||SelectedShapes.Contains(next))?Cursors.SizeAll:Tool==Tool.Text?Cursors.IBeam:Cursors.Cross;
+        }
+
+        void BeginEditGesture(PointF point)
+        {
+            dragFrom=point;orig=selected.Clone();gestureBefore=Take();gestureRedo=redo.ToArray();gestureCommitted=false;BeginSelectionGesture();Capture=true;
+        }
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);lastPointer=e.Location;if(polygonJustClosed&&e.Clicks>1){polygonJustClosed=false;return;}polygonJustClosed=false;if(PolygonPointerDown(e)||PathAnchorDown(e))return;if(FullCaptureSurface&&CaptureDown!=null&&CaptureDown(e))return;
+            if(e.Button==MouseButtons.Left&&TrySampleColor(e.Location))return;if(Busy)return;Fit();
+            if(!InPlaceViewport&&(e.Button==MouseButtons.Middle||e.Button==MouseButtons.Left&&spacePan)){panning=true;panFrom=e.Location;panStart=pan;panButton=e.Button;Capture=true;return;}
+            if(Typing){CommitText();return;}if(e.Button==MouseButtons.Right){if(!ShowShapeFillMenu(e.Location))SelectShape(null);return;}if(e.Button!=MouseButtons.Left)return;Focus();
+            var point=ToImg(e.Location,true);if(CanUseSelectionControls&&RotationAt(e.Location)){drag=Drag.Rotate;BeginEditGesture(ToImg(e.Location,false));rotationPivot=SelectionCount>1?Painter.Center(gestureBounds):Painter.RotationCenter(orig);rotationStart=PointerAngle(dragFrom,rotationPivot);return;}int index=CanUseSelectionControls?HandleAt(e.Location):-1;
+            if(index>=0){handle=index;var target=SelectionCount>1?Handles(selected)[index]:Painter.WorldPoint(selected,Handles(selected)[index]);var raw=ToImg(e.Location,false);grab=new PointF(target.X-raw.X,target.Y-raw.Y);drag=Drag.Resize;BeginEditGesture(raw);return;}
+            Shape hit=ShapeAt(e.Location);
+            if(hit!=null){
+                if((InputModifiers&(Keys.Control|Keys.Shift))!=0){ToggleSelection(hit);return;}
+                if(e.Clicks>1&&(hit.Kind==Tool.Text||Painter.HasNote(hit.Kind)||hit.Kind==Tool.Watermark)){SelectShape(hit);StartText(hit.A,hit);return;}
+                if(!SelectedShapes.Contains(hit)&&DrawsByDragging&&ScreenRect(Crop).Contains(e.Location)){
+                    pendingPick=hit;pendingPickAt=e.Location;drag=Drag.PickOrDraw;Capture=true;return;
+                }
+                PickShape(hit,point);drag=Drag.Move;BeginEditGesture(ToImg(e.Location,false));return;
+            }
+            if((InputModifiers&Keys.Control)!=0)return;SelectShape(null);if(!ScreenRect(Crop).Contains(e.Location))return;
+            if(Tool==Tool.PenPath||Tool==Tool.Pen&&DefaultStyle.ClosedPen){BeginPolygon(point);StartDraftTangent(0,e.Location);return;}
+            if(Tool==Tool.Text){StartText(point,null);return;}if(Tool==Tool.Callout){AddCallout(point);return;}
+            if(Tool==Tool.Counter){Commit();var counter=NewShape(Tool.Counter);counter.A=counter.B=point;counter.Number=NextNumber();if(counter.LeaderCounter)counter.B=new PointF(point.X+64,point.Y+48);shapes.Add(counter);SelectShape(counter);NotifyEdit();return;}
+            BeginDrawingGesture(point);
+        }
+        void PickShape(Shape hit,PointF point)
+        {
+            if(!SelectedShapes.Contains(hit))SelectShape(hit);
+            var local=Painter.LocalPoint(hit,point);
+            movingNote=Painter.HasNote(hit.Kind)&&!string.IsNullOrEmpty(hit.Text)&&Painter.NoteBounds(hit).Contains(local);
+            movingCounterBadge=hit.Kind==Tool.Counter&&hit.LeaderCounter&&!movingNote&&Painter.CounterBadge(hit).Contains(local);
+        }
+        void BeginDrawingGesture(PointF point)
+        {
+            cur=NewShape(Tool);cur.A=cur.B=point;dragFrom=point;if(Tool==Tool.Pen)cur.Points=new List<PointF>{point};drag=Drag.Draw;Capture=true;Invalidate();
+        }
+        Shape NewShape(Tool kind){if(DrawStart!=null)DrawStart();var result=new Shape{Kind=kind,Color=Color,Weight=Weight,Width=StrokeFor(Weight),FontPx=FontFor(Weight)};ApplyDefaultStyle(result);return result;}
+        static PointF Constrained(PointF start,PointF end,Tool kind)
+        {
+            float dx=end.X-start.X,dy=end.Y-start.Y;if(Shape.IsLinear(kind)){double angle=Math.Round(Math.Atan2(dy,dx)/(Math.PI/4))*(Math.PI/4),length=Math.Sqrt(dx*dx+dy*dy);return new PointF(start.X+(float)(length*Math.Cos(angle)),start.Y+(float)(length*Math.Sin(angle)));}
+            float edge=Math.Max(Math.Abs(dx),Math.Abs(dy));return new PointF(start.X+(dx<0?-edge:edge),start.Y+(dy<0?-edge:edge));
+        }
+        void UpdateGesture(Point pixel)
+        {
+            if(drag==Drag.PickOrDraw){
+                if(Math.Abs(pixel.X-pendingPickAt.X)<Pu(4)&&Math.Abs(pixel.Y-pendingPickAt.Y)<Pu(4))return;
+                pendingPick=null;SelectShape(null);BeginDrawingGesture(ToImg(pendingPickAt,true));
+            }
+            var point=ToImg(pixel,drag==Drag.Draw);bool square=(InputModifiers&Keys.Shift)!=0;
+            if(drag==Drag.Draw){cur.B=square?Constrained(cur.A,point,cur.Kind):point;if(cur.Points!=null){if(square){cur.B=Math.Abs(point.X-cur.A.X)>=Math.Abs(point.Y-cur.A.Y)?new PointF(point.X,cur.A.Y):new PointF(cur.A.X,point.Y);cur.Points=new List<PointF>{cur.A,cur.B};}else if(cur.Points.Count==0||cur.Points[cur.Points.Count-1]!=point)cur.Points.Add(point);}Invalidate();return;}
+            if(drag!=Drag.Move&&drag!=Drag.Resize&&drag!=Drag.Rotate)return;
+            if(!gestureCommitted&&Math.Abs(point.X-dragFrom.X)+Math.Abs(point.Y-dragFrom.Y)<.001)return;
+            if(!gestureCommitted){undo.Add(gestureBefore);redo.Clear();version++;gestureCommitted=true;}
+            if(drag==Drag.Rotate)RotateGesture(point,square);
+            else if(drag==Drag.Move){if(SelectionCount>1)MoveSelection(point.X-dragFrom.X,point.Y-dragFrom.Y);else{selected.Offset(orig,0,0);selected.NoteOffset=orig.NoteOffset;MoveAnnotation(point.X-dragFrom.X,point.Y-dragFrom.Y);}}
+            else{point=new PointF(point.X+grab.X,point.Y+grab.Y);if(SelectionCount==1){point=Painter.LocalPoint(orig,point);selected.Offset(orig,0,0);selected.NoteOffset=orig.NoteOffset;}
+                if(SelectionCount>1)ResizeSelection(point,square);
+                else if((movingNote&&Painter.HasNote(selected.Kind))||selected.Kind==Tool.Text)ResizeNote(selected,orig,handle,point);
+                else if(Shape.IsLinear(selected.Kind)){if(handle==0)selected.A=point;else if(handle==1)selected.B=point;else selected.SetMid(point,Pu(4)/k);}
+                else{var target=ResizeBounds(HandleBounds(orig),handle,point,square);if(selected.Kind==Tool.Counter){if(selected.LeaderCounter)selected.B=new PointF(target.Left+target.Width/2,target.Top+target.Height/2);else selected.A=selected.B=new PointF(target.Left+target.Width/2,target.Top+target.Height/2);selected.MarkerSize=target.Width;}else TransformShape(selected,orig,orig.Box,target);}
+                if(SelectionCount==1)PreserveRotationFrame(selected,orig);
+            }
+            foreach(var shape in SelectedShapes)shape.DropCache();NotifyEdit();
+        }
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);lastPointer=e.Location;if(UpdatePathPointer(e.Location))return;if(polygonDrawing){if(FullCaptureSurface&&CaptureMove!=null)CaptureMove(e);Cursor=cur.Points.Count>=3&&NearPolygonStart(e.Location)?Cursors.Hand:Cursors.Cross;return;}if(FullCaptureSurface&&CaptureMove!=null&&CaptureMove(e))return;
+            if(panning){pan=new PointF(panStart.X+e.X-panFrom.X,panStart.Y+e.Y-panFrom.Y);Rescaled();return;}
+            if(drag!=Drag.None)UpdateGesture(e.Location);else if(!Typing)UpdateHover(e.Location);
+        }
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);lastPointer=e.Location;if(FinishPathPointer(e)||polygonDrawing)return;if(FullCaptureSurface&&CaptureUp!=null&&CaptureUp(e))return;
+            if(panning){if(e.Button==panButton){panning=false;Capture=false;}return;}if(e.Button!=MouseButtons.Left||drag==Drag.None)return;
+            UpdateGesture(e.Location);var completed=drag;drag=Drag.None;Capture=false;gestureShapes=null;gestureBefore=null;gestureRedo=null;orig=null;
+            if(completed==Drag.PickOrDraw){var hit=pendingPick;pendingPick=null;PickShape(hit,ToImg(pendingPickAt,true));}
+            if(completed==Drag.Draw){var mark=cur;cur=null;if(mark.Kind==Tool.Crop){if(mark.Box.Width>=1&&mark.Box.Height>=1){Commit();Crop=RectangleF.Intersect(mark.Box,new RectangleF(PointF.Empty,Img.Size));NotifyEdit();}}
+                else if(mark.Kind==Tool.Spotlight?mark.Box.Width>=1&&mark.Box.Height>=1:mark.Kind==Tool.Pen||mark.Box.Width+mark.Box.Height>=1){Commit();shapes.Add(mark);SelectShape(mark);NotifyEdit();if(mark.Kind==Tool.Cloud){movingNote=true;PlaceNoteInside(mark);StartText(mark.A,mark);}}
+            }Fire(StateChanged);Invalidate();
+        }
+        protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture&&(drag!=Drag.None||panning||pathDragging))CancelGesture();}
+        protected override void OnMouseLeave(EventArgs e){base.OnMouseLeave(e);if(!Busy){hover=null;Invalidate();}}
+        public void CancelGesture()
+        {
+            CancelPathPointer();polygonDrawing=false;polygonJustClosed=false;polygonRedo.Clear();CancelColorPick();if(gestureBefore!=null&&gestureCommitted){if(undo.Count>0)undo.RemoveAt(undo.Count-1);Restore(gestureBefore);redo.Clear();if(gestureRedo!=null)redo.AddRange(gestureRedo);}cur=null;orig=null;pendingPick=null;drag=Drag.None;panning=false;gestureShapes=null;gestureBefore=null;gestureRedo=null;gestureCommitted=false;Capture=false;Fire(StateChanged);Invalidate();
+        }
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);if(Typing)return;if(PolygonKey(e.KeyData)){e.Handled=true;e.SuppressKeyPress=true;return;}
+            if(e.KeyCode==Keys.Escape){if(Busy)CancelGesture();else SelectShape(null);e.Handled=true;return;}
+            if(e.KeyCode==Keys.ShiftKey&&(drag==Drag.Draw||drag==Drag.Resize||drag==Drag.Rotate))UpdateGesture(lastPointer);
+            if(Busy)return;
+            if(ApplyArrangeKey(e.KeyData)){e.Handled=true;return;}
+            if(e.KeyCode==Keys.Space){spacePan=true;return;}if(e.Control){switch(e.KeyCode){case Keys.A:SelectAll();break;case Keys.D:DuplicateSelected();break;case Keys.Z:Undo();break;case Keys.Y:Redo();break;default:return;}e.Handled=true;return;}
+            if(e.KeyCode==Keys.Delete){DeleteSelected();e.Handled=true;return;}int step=e.Shift?10:1;switch(e.KeyCode){case Keys.Left:Nudge(-step,0);break;case Keys.Right:Nudge(step,0);break;case Keys.Up:Nudge(0,-step);break;case Keys.Down:Nudge(0,step);break;default:return;}e.Handled=true;
+        }
+        protected override void OnKeyUp(KeyEventArgs e){if(e.KeyCode==Keys.Space)spacePan=false;if(e.KeyCode==Keys.ShiftKey&&(drag==Drag.Draw||drag==Drag.Resize||drag==Drag.Rotate))UpdateGesture(lastPointer);base.OnKeyUp(e);}
+        protected override void OnLostFocus(EventArgs e){spacePan=false;base.OnLostFocus(e);}
+
+        Snapshot Take(){return new Snapshot{Shapes=shapes.Select(s=>s.Clone()).ToList(),Crop=Crop,Background=Bg==null?null:Bg.Clone(),BackgroundOn=BgOn,OutputCornerRadius=OutputCornerRadius,Extra=SaveExtra==null?null:SaveExtra()};}
+        void Commit(){undo.Add(Take());if(undo.Count>128)undo.RemoveAt(0);redo.Clear();version++;nudged=null;}
+        public void Checkpoint(){CommitText();Commit();Fire(StateChanged);}
+        void Restore(Snapshot state)
+        {
+            string primary=selected==null?null:selected.Id;var ids=new HashSet<string>(SelectedShapes.Select(s=>s.Id));foreach(var mark in shapes)mark.DropCache();shapes=state.Shapes.Select(s=>s.Clone()).ToList();Crop=state.Crop;Bg=state.Background==null?null:state.Background.Clone();BgOn=state.BackgroundOn;OutputCornerRadius=state.OutputCornerRadius;
+            selection.Clear();selection.AddRange(shapes.Where(s=>ids.Contains(s.Id)));selected=shapes.FirstOrDefault(s=>s.Id==primary);if(selected==null)selected=selection.LastOrDefault();hover=null;nudged=null;version++;if(LoadExtra!=null)LoadExtra(state.Extra);NotifyEdit();
+        }
+        public void Undo(){if(polygonDrawing){UndoPolygonPoint();return;}if(Typing){CancelText();return;}CancelGesture();if(undo.Count==0)return;redo.Add(Take());var last=undo[undo.Count-1];undo.RemoveAt(undo.Count-1);Restore(last);}
+        public void Redo(){if(polygonDrawing){RedoPolygonPoint();return;}if(Typing||redo.Count==0)return;CancelGesture();undo.Add(Take());var last=redo[redo.Count-1];redo.RemoveAt(redo.Count-1);Restore(last);}
+        public void SelectShape(Shape shape){pathAnchor=-1;selected=shape;SetSingleSelection(shape);movingNote=false;movingCounterBadge=false;Fire(StateChanged);Invalidate();}
+        Tool lastLineTool=Tool.Arrow;
+        internal Tool LastLineTool {get{return lastLineTool;}}
+        public void SetTool(Tool kind)
+        {
+            CancelGesture();CommitText();Tool=kind;hover=null;
+            if(Shape.IsLinear(kind))lastLineTool=kind;
+            SelectShape(null);Cursor=kind==Tool.Text?Cursors.IBeam:Cursors.Cross;
+        }
+        public void SetColor(Color color)
+        {
+            Color=System.Drawing.Color.FromArgb(255,color);if(UsesOutlineFill(Tool)||Tool==Tool.Text)DefaultStyle.FillColor=System.Drawing.Color.FromArgb(DefaultStyle.FillColor.A,Color);
+            if(selected!=null)EditSelected(delegate(Shape mark){mark.Color=Color;if(mark.Kind==Tool.Text){mark.FillEnabled=!mark.TransparentText;mark.FillColor=Color;}else if(UsesOutlineFill(mark.Kind))mark.FillColor=System.Drawing.Color.FromArgb(mark.FillColor.A,Color);mark.HasNoteTextColor=true;mark.NoteTextColor=System.Drawing.Color.White;});RefreshPolygonStyle();PlaceBox();Fire(StateChanged);Invalidate();
+        }
+        public void SetWeight(int weight){Weight=Math.Max(0,Math.Min(2,weight));if(selected!=null)EditSelected(delegate(Shape mark){mark.Weight=Weight;mark.Width=StrokeFor(Weight);mark.FontPx=FontFor(Weight);});PlaceBox();Fire(StateChanged);}
+        public void DeleteSelected(){if(selected==null||Typing)return;DeleteSelection();}
+        public void DuplicateSelected(){if(selected==null||Typing)return;DuplicateSelection();}
+        public void Nudge(int dx,int dy){if(selected==null||Typing)return;if(nudged!=selected||nudgedAt!=version)Commit();nudged=selected;nudgedAt=version;foreach(var mark in SelectedShapes)mark.Offset(mark,dx,dy);NotifyEdit();}
+        internal static void Renumber(List<Shape> list){int next=1;foreach(var mark in list.Where(s=>s.Kind==Tool.Counter).OrderBy(s=>s.Number))mark.Number=next++;}
+        int NextNumber(){int value=0;foreach(var shape in shapes)if(shape.Kind==Tool.Counter)value=Math.Max(value,shape.Number);return value>=9999?9999:value+1;}
+        public string HintText{get{return polygonDrawing?"单击加角点，拖动加平滑点。点击起点或按 Enter 闭合":EditingPath?"拖动锚点或手柄。Alt+单击切换角点／平滑点":Typing?"输入文字，Enter 完成，Shift+Enter 换行，Esc 取消":HasSelection?"拖动移动，拖动控制点缩放；Shift/Ctrl 多选；Delete 删除":Tool==Tool.PenPath?"单击加角点，拖动加平滑点。点击起点或按 Enter 闭合":"拖动绘制，Shift 约束比例；滚轮缩放";}}
+
+        float InputSize{get{return editing==null?DefaultStyle.FontPx:Painter.HasNote(editing.Kind)?Painter.NoteFont(editing):editing.FontPx;}}
+        Shape LiveInput(){var live=editing==null?NewInputShape():editing.Clone();live.Text=box==null?live.Text:box.Text;return live;}
+        Shape NewInputShape(){var mark=new Shape{Kind=Tool.Text,Color=Color,A=boxAt,B=boxAt};ApplyDefaultStyle(mark);return mark;}
+        void StartText(PointF point,Shape existing)
+        {
+            if(Typing)CommitText();if(DrawStart!=null)DrawStart();editing=existing;boxAt=point;
+            box=new AnnotationTextInput{Visible=false,Multiline=true,BorderStyle=BorderStyle.None,MaxLength=20000,AcceptsReturn=true,Text=existing==null?"":existing.Text??""};
+            box.TextChanged+=delegate{PlaceBox();};box.CompositionChanged+=PlaceBox;
+            box.KeyDown+=delegate(object sender,KeyEventArgs e){if(((AnnotationTextInput)sender).Composition!=null)return;if(e.KeyCode==Keys.Enter&&!e.Shift){e.SuppressKeyPress=true;CommitText();}else if(e.KeyCode==Keys.Escape){e.SuppressKeyPress=true;CancelText();}};
+            Controls.Add(box);PlaceBox();box.Show();box.Focus();box.SelectionStart=box.TextLength;Fire(StateChanged);
+        }
+        void PlaceBox()
+        {
+            if(box==null||box.CompletingComposition)return;
+            Fit();
+            float fontSize=Math.Max(9,InputSize*k);
+            if(inputFont==null||Math.Abs(inputFont.Size-fontSize)>.01){
+                var prior=inputFont;inputFont=new Font("Microsoft YaHei UI",fontSize,GraphicsUnit.Pixel);
+                box.Font=inputFont;if(prior!=null)prior.Dispose();
+            }
+            var live=LiveInput();
+            live.Text=box.LayoutText;
+            bool note=Painter.HasNote(live.Kind),wrap=note||live.TextWrap;
+            var bounds=note?Painter.NoteBounds(live):Painter.TextBounds(live);
+            box.WordWrap=wrap;box.ForeColor=live.Kind==Tool.Text?Painter.TextInk(live):System.Drawing.Color.White;
+            var color=Painter.LabelColor(live);
+            bool backdrop=live.Kind==Tool.Text&&live.TransparentText;
+            bool colorChanged=box.BackColor!=color||box.UseSceneBackdrop!=backdrop;
+            box.BackColor=color;box.UseSceneBackdrop=backdrop;
+            if(editing!=null&&editing.Rotation!=0)bounds.Location=Painter.WorldPoint(editing,bounds.Location);
+
+            const TextFormatFlags measureFlags=TextFormatFlags.NoPadding|TextFormatFlags.NoPrefix|TextFormatFlags.TextBoxControl|TextFormatFlags.ExpandTabs;
+            var unconstrained=new Size(32767,32767);
+            int lineHeight=TextRenderer.MeasureText("国",box.Font,unconstrained,measureFlags|TextFormatFlags.SingleLine).Height;
+            int minWidth=Math.Max(24,lineHeight+4);
+            int width=Math.Max(minWidth,(int)Math.Ceiling((bounds.Width-16)*k));
+            int naturalWidth=TextRenderer.MeasureText(live.Text,box.Font,unconstrained,measureFlags).Width+6;
+            if(!wrap)width=Math.Max(width,naturalWidth);
+            else if(live.NoteAutoWidth){
+                int wrapLimit=(int)Math.Ceiling((Math.Max(60,Math.Min(800,live.NoteWidth))-16)*k);
+                width=Math.Max(width,Math.Min(wrapLimit,naturalWidth));
+            }
+            // Before the IME confirms a candidate, the native edit control needs room for its preedit string.
+            if(box.Composition!=null){
+                int composingWidth=box.Composition.Length==0?(int)Math.Ceiling(fontSize*4):
+                    TextRenderer.MeasureText(box.Composition,box.Font,unconstrained,measureFlags).Width+8;
+                width=Math.Max(width,composingWidth);
+            }
+
+            var at=ToScreen(new PointF(bounds.Left+8,bounds.Top+8));
+            box.Bounds=new Rectangle(at,new Size(width,Math.Max(lineHeight,box.Height)));
+            bool singleLine=live.Text.IndexOf('\n')<0&&live.Text.IndexOf('\r')<0&&(!wrap||naturalWidth<=width);
+            int height=(singleLine?1:box.VisibleLineCount)*lineHeight;
+            if(box.Composition!=null&&!singleLine){
+                var measured=TextRenderer.MeasureText(live.Text,box.Font,new Size(width,32767),measureFlags|(wrap?TextFormatFlags.WordBreak:0));
+                height=Math.Max(height,measured.Height);
+            }
+            box.Height=height;
+            int inset=Math.Max(1,(int)Math.Round(8*k));
+            var next=Rectangle.Inflate(box.Bounds,inset,inset);
+            if(!live.NoteAutoWidth)next.Height=Math.Max(next.Height,(int)Math.Ceiling(live.NoteHeight*k));
+            var previous=lastInputBounds;lastInputBounds=next;
+            if(colorChanged||previous!=next)Invalidate(previous.IsEmpty?next:Rectangle.Union(previous,next));
+        }
+        void BoxLabel(Graphics graphics){if(!box.UseSceneBackdrop)using(var path=Theme.Round(lastInputBounds,6*k))using(var brush=new SolidBrush(box.BackColor))graphics.FillPath(brush,path);}
+        void DropBox(TextBox input){Controls.Remove(input);input.Dispose();if(inputFont!=null){inputFont.Dispose();inputFont=null;}lastInputBounds=Rectangle.Empty;}
+        public void CommitText()
+        {
+            if(box==null)return;string text=box.Text.TrimEnd();var previous=editing;var live=LiveInput();var input=box;box=null;editing=null;DropBox(input);
+            if(previous==null){if(text.Length>0){Commit();live.Text=text;shapes.Add(live);SelectShape(live);}}
+            else if(text!=(previous.Text??"")){Commit();if(text.Length==0&&(previous.Kind==Tool.Text||previous.Kind==Tool.Callout)){shapes.Remove(previous);SelectShape(null);}else previous.Text=text;}
+            Fire(Changed);Fire(StateChanged);Invalidate();
+        }
+        void CancelText(){if(box==null)return;var previous=box;box=null;editing=null;DropBox(previous);Fire(StateChanged);Invalidate();}
+
+        static Bitmap CopyArea(Bitmap source,Rectangle area){return source.Clone(area,PixelFormat.Format32bppArgb);}
+        public Bitmap Render(){return RenderContent(false);}
+        Bitmap RenderContent(bool preview)
+        {
+            var area=CropRect;var result=CopyArea(Img,area);
+            try{using(var g=Graphics.FromImage(result)){g.TranslateTransform(-area.X,-area.Y);Painter.DrawMarks(g,shapes,preview&&cur!=null&&cur.Kind!=Tool.Crop?cur:null,preview?editing:null,Img,area);if(preview)PaintEditingAnchor(g);}if(BgOn&&Bg!=null){BackgroundStyle.Validate(Bg,result.Size);var composed=Backdrop.Compose(result,Bg,Info());result.Dispose();result=composed;}return RoundOutput(result,OutputCornerRadius);}catch{result.Dispose();throw;}
+        }
+        public Bitmap RenderMarks(Rectangle area){var result=new Bitmap(Math.Max(1,area.Width),Math.Max(1,area.Height),PixelFormat.Format32bppArgb);try{using(var g=Graphics.FromImage(result)){g.TranslateTransform(-area.X,-area.Y);Painter.DrawMarks(g,shapes,null,null,Img,area);}return result;}catch{result.Dispose();throw;}}
+        public void ShowPlayFrame(byte[] pixels,int width,int height)
+        {
+            var frame=new Bitmap(width,height,PixelFormat.Format32bppArgb);var data=frame.LockBits(new Rectangle(Point.Empty,frame.Size),ImageLockMode.WriteOnly,PixelFormat.Format32bppArgb);try{for(int row=0;row<height;row++)System.Runtime.InteropServices.Marshal.Copy(pixels,row*width*4,IntPtr.Add(data.Scan0,row*data.Stride),width*4);}finally{frame.UnlockBits(data);}if(playFrame!=null)playFrame.Dispose();playFrame=frame;if(IsHandleCreated&&!IsDisposed)BeginInvoke((Action)Invalidate);
+        }
+        public void EndPlayFrame(){if(playFrame!=null){playFrame.Dispose();playFrame=null;}if(box!=null)box.RefreshBackdrop();Invalidate();}
+        public void ReplaceImage(Bitmap image){if(image==null)throw new ArgumentNullException("image");if(image.Size!=Img.Size){image.Dispose();return;}var old=Img;Img=image;old.Dispose();foreach(var mark in shapes)mark.DropCache();if(captureScene!=null){captureScene.Dispose();captureScene=null;}if(backdropInfo!=null){backdropInfo.Dispose();backdropInfo=null;}EndPlayFrame();Invalidate();}
+        public void Release(){if(released)return;released=true;foreach(var mark in shapes)mark.DropCache();if(cur!=null)cur.DropCache();if(backdropInfo!=null)backdropInfo.Dispose();if(playFrame!=null)playFrame.Dispose();Img.Dispose();}
+    }
+}

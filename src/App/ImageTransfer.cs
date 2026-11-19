@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     // Files remain until the next cleanup window because some drop targets open them after OLE returns.
     internal static class ImageTransfer

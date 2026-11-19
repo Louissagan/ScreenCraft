@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed class SettingsDialog:Form
     {
@@ -14,14 +14,14 @@ namespace Stackshot
         const string KeyHint="点击快捷键栏后按组合键；Delete 清除，Esc 恢复，Tab 切换。";
         public SettingsDialog(Preferences previous,string dataPath,Func<Preferences,string> save,string runtimeStatus=null)
         {
-            Text="ScreenCraft 设置 · "+Application.ProductVersion;Icon=ShotStack.AppIcon;StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.Sizable;ControlBox=true;MinimizeBox=true;MaximizeBox=true;
+            Text="ScreenCraft 设置 · "+Application.ProductVersion;Icon=CaptureHost.AppIcon;StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.Sizable;ControlBox=true;MinimizeBox=true;MaximizeBox=true;
             Font=new Font("Microsoft YaHei UI",9F);AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.Dpi;
             BackColor=PreferencesLook.Background;ForeColor=PreferencesLook.Ink;ClientSize=new Size(860,680);MinimumSize=new Size(720,520);DoubleBuffered=true;
             string[] labels={"常规","截图","快捷键","工具栏","OCR 与取色","关于","贴图"},icons={"gear","crop","keyboard","rect","ocr","info","stack"};
             body.BackColor=BackColor;Controls.Add(body);
             for(int i=0;i<tabs.Length;i++){int index=i;tabs[i]=new PreferencesTab{Text=labels[i],Glyph=icons[i],AccessibleName=labels[i],TabIndex=i+1};tabs[i].Click+=delegate{SelectPage(index);};Controls.Add(tabs[i]);pages[i]=new Panel{Dock=DockStyle.Fill,AutoScroll=true,BackColor=BackColor};pages[i].SizeChanged+=delegate(object sender,EventArgs e){LayoutPage((Panel)sender);};body.Controls.Add(pages[i]);}
             var startup=new PreferencesSwitch{Checked=previous.RunOnStartup,AccessibleName="登录 Windows 后在后台启动（仅当前用户）"};
-            var notice=new PreferencesSwitch{Checked=previous.ShowStartupNotice,AccessibleName="启动时显示悬浮提示"};
+            var notice=new PreferencesSwitch{Checked=previous.ShowStartupNotice,AccessibleName="启动时显示系统通知"};
             AddHeading(0,"常规","轻点托盘图标截图；右键打开功能与设置。");
             AddGroup(0,new PreferencesRow("登录 Windows 后启动",startup,42),new PreferencesRow("启动时显示提示",notice,42));
             AddNote(0,"关闭此窗口后继续在托盘运行。双击程序不会再打开主面板。\n如需退出，请右键托盘图标，选择“退出”。");

@@ -1,4 +1,4 @@
-// Only self-owned controls and a synthetic frozen image; no desktop pixels, text or clipboard are read.
+﻿// Only self-owned controls and a synthetic frozen image; no desktop pixels, text or clipboard are read.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -8,13 +8,13 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Stackshot;
+using ScreenCraft;
 class SmartRegionProbe
 {
     static BindingFlags flags=BindingFlags.NonPublic|BindingFlags.Instance;
     static object Field(object target,string name){return target.GetType().GetField(name,flags).GetValue(target);}
     static object Call(object target,string name,params object[] args){return target.GetType().GetMethod(name,flags).Invoke(target,args);}
-    static object Static(string method,params object[] args){return typeof(Canvas).Assembly.GetType("Stackshot.SmartRegions").GetMethod(method,BindingFlags.NonPublic|BindingFlags.Static).Invoke(null,args);}
+    static object Static(string method,params object[] args){return typeof(Canvas).Assembly.GetType("ScreenCraft.SmartRegions").GetMethod(method,BindingFlags.NonPublic|BindingFlags.Static).Invoke(null,args);}
     static void Check(bool value,string detail){if(!value)throw new Exception(detail);}
     static void Wait(Func<bool> ready){var clock=System.Diagnostics.Stopwatch.StartNew();while(!ready()&&clock.ElapsedMilliseconds<6000){Application.DoEvents();Thread.Sleep(5);}Check(ready(),"probe timed out");}
     static void Mouse(RegionPicker p,string method,int x,int y){Call(p,method,new MouseEventArgs(MouseButtons.Left,1,x,y,0));}

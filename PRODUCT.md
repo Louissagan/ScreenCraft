@@ -16,7 +16,7 @@ Windows native desktop, Windows 11/10 x64. The skill's web/mobile enum does not 
 
 ## Stack
 
-用户明确授权技术选型。两个候选已实际拉取与构建，开发采用 Stackshot 的原生 C#/WinForms/WPF 核心模块，保留 MIT 通知。
+采用 Windows 原生 C# / WinForms，使用本机 Windows OCR。0.10 起运行时由 `src/App` 和 `src/Core` 编译。早期版本及安装模板的 Stackshot 来源见 [第三方声明](THIRD_PARTY_NOTICES.md)。
 
 ## Capabilities and Constraints
 

@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     static class AnnotationInteractionTests
     {
@@ -37,7 +37,7 @@ namespace Stackshot
                     c.AddAnnotation(ScreenCraftTests.Mark(Tool.Rect,400,100,520,220));c.SelectAll();h=c.SelectionHandles();check(h.Length==8,"group midpoints missing");var old=c.AnnotationSnapshot;c.Drag(h[5],new Point(h[5].X+100,h[5].Y));check(c.AnnotationSnapshot[0].Box.Width>old[0].Box.Width&&c.AnnotationSnapshot[1].Box.Width>old[1].Box.Width,"group resize stacked or skipped objects");c.Undo();check(c.AnnotationSnapshot[0].Box==old[0].Box&&c.AnnotationSnapshot[1].Box==old[1].Box,"group resize undo");}
             });
             run("labels/typing recoloring and reediting retain selected background and white glyphs",delegate{
-                using(var c=new Input()){c.SetTool(Tool.Text);c.SetColor(Color.Purple);c.Click(100,100);var input=c.Controls.OfType<TextBox>().Single();input.Text="建筑分析";check(input.BackColor.ToArgb()==Color.Purple.ToArgb()&&input.ForeColor.ToArgb()==Color.White.ToArgb(),"initial editing colors wrong");c.SetColor(Color.Blue);check(input.BackColor.ToArgb()==Color.Blue.ToArgb()&&input.ForeColor.ToArgb()==Color.White.ToArgb()&&c.Typing,"palette changed text instead of background");c.CommitText();var shape=c.SelectedShape;check(shape.FillColor.ToArgb()==Color.Blue.ToArgb()&&shape.CornerRadius==6,"commit changed label style");c.EditNote();input=c.Controls.OfType<TextBox>().Single();check(input.BackColor.ToArgb()==Color.Blue.ToArgb()&&input.ForeColor.ToArgb()==Color.White.ToArgb(),"reedit changed color roles");c.CommitText();using(var image=c.Render())image.Save(Path.Combine(output,"unified-text-label.png"));}
+                using(var c=new Input()){c.SetTool(Tool.Text);c.ApplyTextPreset(true);c.SetColor(Color.Purple);c.Click(100,100);var input=c.Controls.OfType<TextBox>().Single();input.Text="建筑分析";check(input.BackColor.ToArgb()==Color.Purple.ToArgb()&&input.ForeColor.ToArgb()==Color.White.ToArgb(),"initial editing colors wrong");c.SetColor(Color.Blue);check(input.BackColor.ToArgb()==Color.Blue.ToArgb()&&input.ForeColor.ToArgb()==Color.White.ToArgb()&&c.Typing,"palette changed text instead of background");c.CommitText();var shape=c.SelectedShape;check(shape.FillColor.ToArgb()==Color.Blue.ToArgb()&&shape.CornerRadius==6,"commit changed label style");c.EditNote();input=c.Controls.OfType<TextBox>().Single();check(input.BackColor.ToArgb()==Color.Blue.ToArgb()&&input.ForeColor.ToArgb()==Color.White.ToArgb(),"reedit changed color roles");c.CommitText();using(var image=c.Render())image.Save(Path.Combine(output,"unified-text-label.png"));}
             });
             run("labels/point number and cloud share note geometry and proportional leaders",delegate{
                 using(var c=new Input()){c.SetTool(Tool.Callout);c.SetColor(Color.Teal);c.Click(120,180);c.Controls.OfType<TextBox>().Single().Text="材料与空间";c.CommitText();var body=Painter.NoteBounds(c.SelectedShape);c.SetMarkerSize(48);check(Math.Abs(Painter.LeaderWidth(c.SelectedShape)-4)<.01,"leader ratio not coupled");c.SetAnnotationMode(Tool.Counter);check(c.SelectedShape.Kind==Tool.Counter&&!c.SelectedShape.LeaderCounter&&c.SelectedShape.Number>0&&Painter.NoteBounds(c.SelectedShape).Location==body.Location,"number mode lost point or body");c.SetAnnotationMode(Tool.Cloud);check(c.SelectedShape.Kind==Tool.Cloud&&Painter.NoteBounds(c.SelectedShape).Location==body.Location&&Painter.NoteInk(c.SelectedShape)==Color.White,"cloud changed text box");

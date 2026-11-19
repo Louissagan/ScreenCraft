@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-namespace Stackshot
+namespace ScreenCraft
 {
     // Immutable frozen pixels and a single cached dim layer. Moving the crop never moves this surface HWND.
     internal sealed class CaptureScene:IDisposable
@@ -27,12 +27,16 @@ namespace Stackshot
         internal int CaptureDim=SelectionAppearance.DefaultDimPercent;
         CaptureScene captureScene;
         internal int SceneBuildCount;
+        internal void PrepareCaptureSurface(){SetStyle(System.Windows.Forms.ControlStyles.Opaque,true);}
         internal Func<System.Windows.Forms.MouseEventArgs,bool> CaptureDown,CaptureMove,CaptureUp;
         internal Action<Graphics> PaintCaptureChrome;
-        bool PaintFrozenSurface(System.Windows.Forms.PaintEventArgs e)
+        void PaintFrozenContent(Graphics g)
         {
-            if(!FullCaptureSurface)return false;Fit();var g=e.Graphics;PaintCaptureBackdrop(g);var state=g.Save();using(var path=Theme.Round(Crop,Math.Min(OutputCornerRadius,Math.Min(Crop.Width,Crop.Height)/2)))g.SetClip(path,CombineMode.Intersect);Painter.DrawMarks(g,shapes,cur!=null&&cur.Kind!=Tool.Crop?cur:null,editing,Img,Crop);PaintEditingAnchor(g);g.Restore(state);
-            if(box!=null){if(BoxStale())PlaceBox();BoxLabel(g);}if(hover!=null&&hover!=selected&&drag==Drag.None&&box==null)Outline(g,hover,false);if(selected!=null&&box==null){if(SelectionCount>1)OutlineGroup(g);else Outline(g,selected,true);}if(PaintCaptureChrome!=null)PaintCaptureChrome(g);return true;
+            PaintCaptureBackdrop(g);var state=g.Save();using(var path=Theme.Round(Crop,Math.Min(OutputCornerRadius,Math.Min(Crop.Width,Crop.Height)/2)))g.SetClip(path,CombineMode.Intersect);Painter.DrawMarks(g,shapes,cur!=null&&cur.Kind!=Tool.Crop?cur:null,editing,Img,Crop);PaintEditingAnchor(g);g.Restore(state);
+        }
+        void PaintFrozenAdornments(Graphics g)
+        {
+            PaintPolygonAnchors(g);if(box!=null)BoxLabel(g);if(hover!=null&&hover!=selected&&drag==Drag.None&&box==null)Outline(g,hover,false);if(selected!=null&&box==null){if(SelectionCount>1)OutlineGroup(g);else if(!EditingPath)Outline(g,selected,true);}if(PaintCaptureChrome!=null)PaintCaptureChrome(g);
         }
         internal void PaintCaptureBackdrop(Graphics g)
         {

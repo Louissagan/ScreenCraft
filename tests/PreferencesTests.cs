@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     static class PreferencesTests
     {

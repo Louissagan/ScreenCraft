@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-namespace Stackshot
+namespace ScreenCraft
 {
     // One artwork for the executable resource, tray and every application window.
     public static class BrandArtwork

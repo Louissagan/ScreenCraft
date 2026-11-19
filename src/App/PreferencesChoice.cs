@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal sealed class PreferencesChoice:PreferencesPaintButton
     {
@@ -22,4 +22,5 @@ namespace Stackshot
         protected override void OnPaint(PaintEventArgs e){var g=e.Graphics;PreferencesLook.Fill(g,ClientRectangle,BackColor);PreferencesLook.Round(g,ClientRectangle,Hover?PreferencesLook.Input:Color.White,8,Focused?CaptureLook.Blue:PreferencesLook.Line);PreferencesLook.Text(g,SelectedItem,Font,new Rectangle(12,0,Math.Max(1,Width-44),Height),Enabled?PreferencesLook.Ink:PreferencesLook.Muted,StringAlignment.Near);using(var pen=new Pen(PreferencesLook.Muted,1.5f)){int x=Width-19,y=Height/2;g.DrawLines(pen,new[]{new Point(x-4,y-2),new Point(x,y+2),new Point(x+4,y-2)});}}
         protected override void Dispose(bool disposing){if(disposing){disposingPopup=true;if(popup!=null){var old=popup;popup=null;old.Dispose();}}base.Dispose(disposing);}
     }
+
 }

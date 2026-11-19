@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 using System.IO;
-namespace Stackshot
+namespace ScreenCraft
 {
     // Managed file streams plus explicit extended paths avoid GDI+/Win32 MAX_PATH checks.
     // No machine-wide long-path policy or registry setting is changed.

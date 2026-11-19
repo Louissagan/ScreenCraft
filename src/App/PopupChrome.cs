@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal static class PopupChrome
     {

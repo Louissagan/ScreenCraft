@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     static class CalloutAndGlassTests
     {
@@ -26,6 +26,45 @@ namespace Stackshot
             run("callout/target and body move independently and corner drag sets manual wrapping width",delegate{using(var owner=new Form{ClientSize=new Size(1000,700)})using(var c=new Input(Source())){owner.Controls.Add(c);c.Bounds=owner.ClientRectangle;c.SetTool(Tool.Callout);c.ClickAt(new PointF(220,180));var input=c.Controls.OfType<TextBox>().Single();input.Text="材料与空间分析";c.SetNoteWidth(260);c.CommitText();var target=c.SelectedShape.A;var body=Painter.NoteBounds(c.SelectedShape);c.DragAt(new PointF(body.Left+35,body.Top+18),new PointF(body.Left+80,body.Top+48));check(c.SelectedShape.A==target&&Painter.NoteBounds(c.SelectedShape).X>body.X+40,"body drag moved target");var fixedBody=Painter.NoteBounds(c.SelectedShape);c.DragAt(target,new PointF(target.X-30,target.Y+35));check(Math.Abs(Painter.NoteBounds(c.SelectedShape).X-fixedBody.X)<2&&Math.Abs(Painter.NoteBounds(c.SelectedShape).Y-fixedBody.Y)<2,"target drag moved body");body=Painter.NoteBounds(c.SelectedShape);c.DragAt(new PointF(body.Left+30,body.Top+18),new PointF(body.Left+31,body.Top+18));var handles=c.SelectionHandles();check(handles.Length==8,"note width handles missing");c.DragPixels(handles[1],new Point(handles[1].X-70,handles[1].Y));check(c.SelectedShape.NoteWidth<220&&!c.SelectedShape.NoteAutoWidth,"corner did not control wrapping width");c.Undo();check(c.AnnotationSnapshot.Single().NoteWidth==260,"width undo");}});
             run("counter/leader badge and target move separately and circular style remains available",delegate{using(var owner=new Form{ClientSize=new Size(1000,700)})using(var c=new Input(Source())){owner.Controls.Add(c);c.Bounds=owner.ClientRectangle;c.SetTool(Tool.Counter);c.SetCounterLeader(true);c.ClickAt(new PointF(250,200));check(c.SelectedShape.LeaderCounter&&c.SelectedShape.A!=c.SelectedShape.B,"no numbered leader badge");c.EditSelected(delegate(Shape s){s.Number=42;});var target=c.SelectedShape.A;var badge=c.SelectedShape.B;c.DragAt(badge,new PointF(badge.X+70,badge.Y+40));check(c.SelectedShape.A==target&&c.SelectedShape.B.X>badge.X+60,"badge drag moved target");badge=c.SelectedShape.B;c.DragAt(target,new PointF(target.X-30,target.Y-25));check(c.SelectedShape.B==badge,"target drag moved number badge");c.SetNumberSize(36);using(var image=c.Render())image.Save(Path.Combine(output,"counter-leader-offscreen.png"));c.SetCounterLeader(false);check(!c.SelectedShape.LeaderCounter&&c.SelectedShape.Number==42,"circle switch lost number");c.Undo();check(c.AnnotationSnapshot.Single().LeaderCounter,"style undo");}});
             run("text/plain input grows and reflows when width is changed during typing",delegate{using(var owner=new Form{ClientSize=new Size(1000,700)})using(var c=new Input(Source())){owner.Controls.Add(c);c.Bounds=owner.ClientRectangle;c.SetTool(Tool.Text);c.ClickAt(new PointF(160,180));var box=c.Controls.OfType<TextBox>().Single();box.Text=string.Join(" ",Enumerable.Repeat("analysis",14));check(box.WordWrap,"plain input not wrapping");int before=box.Height;c.SetNoteWidth(130);check(box.WordWrap&&box.Width<130&&box.Height>before,"manual plain text width did not reflow");c.CommitText();check(c.SelectedShape.TextWrap&&c.SelectedShape.NoteWidth==130&&Painter.TextBounds(c.SelectedShape).Width==130,"plain wrapping not stored");}});
+            run("text/short Latin and Chinese input use one visible row",delegate{
+                using(var canvas=new Input(Source()){InPlaceViewport=true,Size=new Size(1000,700)}){
+                    canvas.SetTool(Tool.Text);canvas.ClickAt(new PointF(160,180));
+                    var input=canvas.Controls.OfType<TextBox>().Single();
+                    input.Text="i";int narrow=input.Width,oneLine=input.Height;
+                    check(narrow>=oneLine&&oneLine>=input.Font.Height&&oneLine<1.25*input.Font.Height,"short input collapsed or occupied extra rows");
+                    input.Text="建筑";
+                    check(input.Width>narrow&&input.Height==oneLine,"short Chinese input reserved an unused row: "+input.Size+", expected height "+oneLine);
+                    input.Text+="\r\n说明";
+                    check(input.Height==2*oneLine,"explicit newline did not create a second row: "+input.Size);
+                    input.Text="建筑";canvas.CommitText();
+                    check(canvas.SelectedShape.Text=="建筑"&&Painter.TextBounds(canvas.SelectedShape).Height<=oneLine+20,"committed label was not compact");
+                }
+            });
+            run("text and notes/auto sizing shrinks both dimensions after manual height and survives reopen",delegate{
+                foreach(var kind in new[]{Tool.Text,Tool.Callout,Tool.Cloud,Tool.Counter})using(var c=new Input(Source())){
+                    var mark=ScreenCraftTests.Mark(kind,180,140,280,220);
+                    mark.Text="建筑";mark.TextWrap=true;mark.NoteAutoWidth=false;mark.NoteWidth=320;mark.NoteHeight=260;
+                    c.AddAnnotation(mark);
+                    var before=kind==Tool.Text?Painter.TextBounds(c.SelectedShape):Painter.NoteBounds(c.SelectedShape);
+                    c.SetNoteAutoWidth(true);
+                    var small=kind==Tool.Text?Painter.TextBounds(c.SelectedShape):Painter.NoteBounds(c.SelectedShape);
+                    check(small.Width<before.Width&&small.Height<before.Height&&c.SelectedShape.NoteHeight==0,"manual bounds survived auto sizing "+kind);
+                    c.Undo();check(!c.SelectedShape.NoteAutoWidth&&c.SelectedShape.NoteHeight==260,"auto sizing cannot undo "+kind);
+                    c.SetNoteAutoWidth(true);c.EditNote();
+                    var input=c.Controls.OfType<TextBox>().Single();input.Text=string.Join(" ",Enumerable.Repeat("建筑 analysis",16));
+                    int tall=input.Height,wide=input.Width;
+                    input.Text="图";check(input.Height<tall&&input.Width<wide,"live input did not shrink both axes "+kind);
+                    c.CommitText();
+                    using(var doc=c.ExportDocument()){
+                        var path=Path.Combine(output,"autosize-"+kind+".sccraft");doc.Save(path);
+                        using(var opened=AnnotationDocument.Open(path)){
+                            var saved=opened.Shapes.Single();
+                            var bounds=kind==Tool.Text?Painter.TextBounds(saved):Painter.NoteBounds(saved);
+                            check(saved.NoteAutoWidth&&bounds.Width<before.Width&&bounds.Height<before.Height,"auto sizing lost after reopen "+kind);
+                        }
+                    }
+                }
+            });
             run("document/callout auto width and leader counter roundtrip preserve identical rendered pixels",delegate{using(var c=new Canvas(Source())){var point=ScreenCraftTests.Mark(Tool.Callout,220,180,220,180);point.Text="分析文字 automatically wraps";point.FillEnabled=true;point.FillColor=Color.Red;point.HasNoteTextColor=true;point.NoteTextColor=Color.White;point.NoteAutoWidth=true;point.NoteWidth=180;c.AddAnnotation(point);var number=ScreenCraftTests.Mark(Tool.Counter,450,300,550,360);number.LeaderCounter=true;number.Number=7;c.AddAnnotation(number);using(var doc=c.ExportDocument()){var path=Path.Combine(output,"callout-leader-wrap.sccraft");doc.Save(path);using(var opened=AnnotationDocument.Open(path))using(var a=doc.Render())using(var b=opened.Render()){check(Hash(a)==Hash(b)&&opened.Shapes[0].NoteAutoWidth&&opened.Shapes[1].LeaderCounter,"new shape fields or rendered image lost");a.Save(Path.Combine(output,"callout-and-counter-offscreen.png"));}}}});
             run("glass/blur uses source colors and removes high frequency edges rather than flat white fill",delegate{using(var image=new Bitmap(300,90)){using(var g=Graphics.FromImage(image)){g.Clear(Color.Blue);g.FillRectangle(Brushes.Red,0,0,150,90);for(int x=0;x<300;x+=4)g.DrawLine(Pens.White,x,0,x,89);}using(var glass=FrozenGlass.Blur(image)){check(glass.GetPixel(40,45).R>glass.GetPixel(240,45).R+25&&glass.GetPixel(240,45).B>glass.GetPixel(40,45).B+25,"glass does not contain real backdrop colors");int before=0,after=0;for(int x=5;x<140;x++){before+=Math.Abs(image.GetPixel(x,45).B-image.GetPixel(x-1,45).B);after+=Math.Abs(glass.GetPixel(x,45).B-glass.GetPixel(x-1,45).B);}check(after<before/5,"backdrop was not blurred");glass.Save(Path.Combine(output,"frozen-glass-material-offscreen.png"));}}});
             run("glass/material cache reuses stable positions and never enters exported image",delegate{using(var o=new CaptureOverlay(Source(),new Rectangle(0,0,1000,700),new Rectangle(100,90,750,430),new[]{new Rectangle(0,0,1000,680)})){var c=o.AnnotationCanvas;var bar=Children(o).OfType<CaptureBar>().Single(b=>b.Bounds==o.ToolbarBounds);var texture=bar.Material;c.SetColor(Color.Green);check(ReferenceEquals(texture,bar.Material)&&c.SceneBuildCount==1,"glass or dim layer rebuilt without geometry change");using(var exported=c.Render())check(exported.GetPixel(10,10).ToArgb()==c.Img.GetPixel(110,100).ToArgb(),"glass contaminated exported source pixels");c.SetCaptureSelection(new Rectangle(140,130,700,400),false);check(!ReferenceEquals(texture,bar.Material)&&c.SceneBuildCount==1,"moving toolbar did not update glass or rebuilt mask");}});

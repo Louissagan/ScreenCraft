@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     // Geometric artwork authored for ScreenCraft. Reference: 1Capture's public toolbar examples.
     internal static class CaptureLook
@@ -36,6 +36,11 @@ namespace Stackshot
                             stroke.AddLine(17.5f,20,21.3f,16.7f);
                             g.DrawPath(p,stroke);
                         }break;
+                    case "pen-path":g.DrawPolygon(p,new[]{new Point(4,20),new Point(7,9),new Point(14,5),new Point(19,10),new Point(15,17)});g.DrawLine(p,4,20,11,13);g.DrawEllipse(p,10,11,3,3);g.DrawLine(p,15,4,20,9);break;
+                    case "pen-convert":g.DrawLine(p,3,18,11,7);g.DrawBezier(p,new Point(11,7),new Point(14,7),new Point(18,7),new Point(21,17));g.DrawRectangle(p,9,5,4,4);break;
+                    case "pattern-horizontal":for(int y=6;y<=18;y+=6)g.DrawLine(p,4,y,20,y);break;
+                    case "pattern-vertical":for(int x=6;x<=18;x+=6)g.DrawLine(p,x,4,x,20);break;
+                    case "pattern-cross":g.DrawLine(p,4,4,20,20);g.DrawLine(p,4,20,20,4);g.DrawLine(p,4,12,12,20);g.DrawLine(p,12,4,20,12);break;
                     case "pen-smooth":g.DrawBezier(p,new PointF(3,18),new PointF(20,0),new PointF(4,3),new PointF(21,18));break;
                     case "pen-arrow":g.DrawBezier(p,new PointF(3,4),new PointF(20,2),new PointF(0,14),new PointF(20,20));g.DrawLines(p,new[]{new PointF(14,12),new PointF(20,20),new PointF(10,21)});break;
                     case "arrow-outline":using(var shape=Painter.ArrowPath(new PointF(4,20),new PointF(20,4),3.5f))using(var edge=new Pen(color,2))g.DrawPath(edge,shape);break;
@@ -46,6 +51,17 @@ namespace Stackshot
                         g.DrawArc(p,14.1f,9,6.9f,6,220,142);
                         g.DrawLine(p,21,12,21,18.5f);
                         g.DrawEllipse(p,14.2f,13,6.8f,5.5f);
+                        break;
+                    case "text-ink":
+                        g.DrawLines(p,new[]{new PointF(5.5f,19),new PointF(12,5),new PointF(18.5f,19)});
+                        g.DrawLine(p,7.8f,14,16.2f,14);
+                        break;
+                    case "text-label":
+                        using(var path=Theme.Round(new RectangleF(3,3,18,18),3))g.FillPath(brush,path);
+                        using(var letter=new Pen(Color.White,1.5f){StartCap=LineCap.Round,EndCap=LineCap.Round,LineJoin=LineJoin.Round}){
+                            g.DrawLines(letter,new[]{new PointF(8,16.5f),new PointF(12,7.5f),new PointF(16,16.5f)});
+                            g.DrawLine(letter,9.5f,13.3f,14.5f,13.3f);
+                        }
                         break;
                     case "counter":
                         g.DrawEllipse(p,3,3,18,18);
@@ -61,7 +77,12 @@ namespace Stackshot
                         g.DrawLine(p,7,8.8f,17,8.8f);g.DrawLine(p,7,12.5f,13.8f,12.5f);
                         break;
                     case "counter-leader":g.FillEllipse(brush,1,2,4,4);g.DrawLine(p,5,6,11,12);using(var path=Theme.Round(new Rectangle(10,10,12,12),3))g.DrawPath(p,path);using(var font=new Font("Segoe UI",10,FontStyle.Bold,GraphicsUnit.Pixel))g.DrawString("1",font,brush,12,10);break;
-                    case "grow":g.DrawRectangle(p,8,5,8,14);g.DrawLine(p,1,12,7,12);g.DrawLine(p,17,12,23,12);g.DrawLines(p,new[]{new Point(4,9),new Point(1,12),new Point(4,15)});g.DrawLines(p,new[]{new Point(20,9),new Point(23,12),new Point(20,15)});break;
+                    case "grow":
+                        g.DrawRectangle(p,8,8,8,8);
+                        g.DrawLines(p,new[]{new Point(3,8),new Point(3,3),new Point(8,3)});
+                        g.DrawLine(p,3,3,7,7);
+                        g.DrawLines(p,new[]{new Point(16,21),new Point(21,21),new Point(21,16)});
+                        g.DrawLine(p,17,17,21,21);break;
                     case "cloud":using(var cloud=Painter.CloudPath(new RectangleF(3,4,18,14)))g.DrawPath(p,cloud);g.DrawLines(p,new[]{new PointF(8,18),new PointF(7,22),new PointF(13,18)});break;
                     case "pixelate":
                         for(int row=0;row<3;row++)for(int col=0;col<3;col++)
@@ -111,6 +132,12 @@ namespace Stackshot
                     case "more":for(int x=4;x<=18;x+=7)g.FillEllipse(brush,x-1,10.3f,3.4f,3.4f);break;
                     case "fill":g.FillRectangle(brush,4,4,16,16);break;
                     case "no-fill":g.DrawRectangle(p,4,4,16,16);g.DrawLine(p,5,19,19,5);break;
+                    case "hatch-fill":
+                        g.DrawRectangle(p,4,4,16,16);
+                        g.DrawLine(p,7.5f,12.5f,12.5f,7.5f);
+                        g.DrawLine(p,7.5f,16.5f,16.5f,7.5f);
+                        g.DrawLine(p,12.5f,16.5f,16.5f,12.5f);
+                        break;
                     case "dash":p.DashStyle=DashStyle.Dash;g.DrawLine(p,3,12,21,12);break;
                     case "dot":g.FillEllipse(brush,7,7,10,10);break;
                     case "color":g.DrawLine(p,6,18,17,7);g.DrawLines(p,new[]{new PointF(12,6),new PointF(18,12),new PointF(21,9),new PointF(15,3),new PointF(12,6)});g.DrawLine(p,3,21,7,20);break;
@@ -121,10 +148,25 @@ namespace Stackshot
     }
     internal sealed class CaptureBar:Panel
     {
+        float cornerRadius=10;
         internal Bitmap Material;Rectangle materialBounds,materialRange;
         public CaptureBar(){DoubleBuffered=true;BackColor=Color.Transparent;SetStyle(ControlStyles.SupportsTransparentBackColor,true);Padding=new Padding(6);}
-        internal void UpdateMaterial(Canvas canvas){var range=Rectangle.Round(canvas.Crop);if(Material!=null&&materialBounds==Bounds&&materialRange==range)return;var next=FrozenGlass.Create(canvas,Bounds);var old=Material;Material=next;materialBounds=Bounds;materialRange=range;if(old!=null)old.Dispose();Invalidate(true);}
-        internal void PaintSurface(Graphics g,Rectangle bounds){CaptureLook.SurfaceAt(g,bounds,13);if(Material!=null){var state=g.Save();using(var path=Theme.Round(Rectangle.Inflate(bounds,-2,-2),13))g.SetClip(path,CombineMode.Intersect);g.DrawImage(Material,bounds);g.Restore(state);PreferencesLook.Round(g,Rectangle.Inflate(bounds,-2,-2),Color.Transparent,13,PreferencesLook.Line);}}
+        internal void UpdateMaterial(Canvas canvas){cornerRadius=10*canvas.Ui;var range=Rectangle.Round(canvas.Crop);if(Material!=null&&materialBounds==Bounds&&materialRange==range)return;var next=FrozenGlass.Create(canvas,Bounds);var old=Material;Material=next;materialBounds=Bounds;materialRange=range;if(old!=null)old.Dispose();Invalidate(true);}
+        internal void PaintSurface(Graphics g,Rectangle bounds)
+        {
+            if(bounds.Width<3||bounds.Height<3)return;
+            var state=g.Save();
+            g.SmoothingMode=SmoothingMode.AntiAlias;
+            using(var path=Theme.Round(new RectangleF(bounds.X+1,bounds.Y+1,bounds.Width-2,bounds.Height-2),cornerRadius)){
+                if(Material==null)g.FillPath(Brushes.White,path);
+                else using(var texture=new TextureBrush(Material,WrapMode.Clamp)){
+                    texture.TranslateTransform(bounds.X,bounds.Y);
+                    g.FillPath(texture,path);
+                }
+                using(var edge=new Pen(Color.FromArgb(44,98,103,112)))g.DrawPath(edge,path);
+            }
+            g.Restore(state);
+        }
         protected override void OnPaint(PaintEventArgs e){PaintSurface(e.Graphics,ClientRectangle);base.OnPaint(e);}
         protected override void Dispose(bool disposing){if(disposing&&Material!=null){Material.Dispose();Material=null;}base.Dispose(disposing);}
     }
@@ -158,6 +200,50 @@ namespace Stackshot
         }
         protected override void OnPaint(PaintEventArgs e){PaintButton(e.Graphics,ClientRectangle);}
     }
+    internal static class LineStyleButtons
+    {
+        internal static CaptureIconButton[] Add(Canvas canvas,Func<string,string,Action,CaptureIconButton> add)
+        {
+            return new[]{
+                add("line","无箭头（直线）",()=>canvas.SetLineStyle(LineStyle.NoArrow)),
+                add("arrow","细线箭头",()=>canvas.SetLineStyle(LineStyle.ThinArrow)),
+                add("arrow-solid","渐宽箭头",()=>canvas.SetLineStyle(LineStyle.TaperedArrow)),
+                add("arrow-outline","白边醒目箭头",()=>canvas.SetLineStyle(LineStyle.WhiteOutline))
+            };
+        }
+
+        internal static void Refresh(Canvas canvas,CaptureIconButton[] buttons,Action<Control,bool> setVisible)
+        {
+            bool visible=Shape.IsLinear(canvas.ActiveKind);
+            for(int i=0;i<buttons.Length;i++){
+                setVisible(buttons[i],visible);
+                buttons[i].Selected=visible&&canvas.ActiveLineStyle==(LineStyle)i;
+            }
+        }
+    }
+
+    internal static class ShapeFillButtons
+    {
+        internal static CaptureIconButton[] Add(Canvas canvas,Func<string,string,Action,CaptureIconButton> add)
+        {
+            return new[]{
+                add("no-fill","无填充",()=>canvas.SetShapeFill(ShapeFill.None)),
+                add("fill","半透明填充",()=>canvas.SetShapeFill(ShapeFill.Translucent)),
+                add("hatch-fill","图案填充",()=>canvas.SetShapeFill(ShapeFill.Hatch))
+            };
+        }
+
+        internal static void Refresh(Canvas canvas,CaptureIconButton[] buttons,Action<Control,bool> setVisible)
+        {
+            bool visible=canvas.CanFillShape;
+            var mode=canvas.ActiveShapeFill;
+            for(int i=0;i<buttons.Length;i++){
+                setVisible(buttons[i],visible);
+                buttons[i].Selected=visible&&mode==(ShapeFill)i;
+            }
+        }
+    }
+
     internal sealed class CaptureSlider:Control
     {
         int value=3;bool dragging;public int Minimum=1,Maximum=24;public event EventHandler ValueChanged;

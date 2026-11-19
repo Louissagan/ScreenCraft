@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
-namespace Stackshot
+namespace ScreenCraft
 {
     static class PinTests
     {

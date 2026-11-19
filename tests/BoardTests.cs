@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal static class BoardTests
     {

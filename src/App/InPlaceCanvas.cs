@@ -1,12 +1,12 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Imaging;
-namespace Stackshot
+namespace ScreenCraft
 {
     public partial class Canvas
     {
         public bool InPlaceViewport;
-        public void ChangeDefaultStyle(Action<AnnotationStyle> change){change(DefaultStyle);PlaceBox();Fire(StateChanged);Invalidate();}
+        public void ChangeDefaultStyle(Action<AnnotationStyle> change){change(DefaultStyle);RefreshPolygonStyle();PlaceBox();Fire(StateChanged);Invalidate();}
         public void SetCaptureSelection(Rectangle selection,bool checkpoint)
         {
             var bounds=new Rectangle(0,0,Img.Width,Img.Height);

@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     // Records messages addressed to this control; never installs a keyboard hook or injects input.
     public class HotkeyInput:TextBox

@@ -1,12 +1,12 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     internal sealed class DailySettings
     {
-        readonly string[] tools={"Rect","Ellipse","Line","Arrow","Pen","Text","Callout","Counter","Cloud","Pixelate","Redact","Crop"};
-        readonly PreferencesChoice initial=new PreferencesChoice("矩形","椭圆","直线","箭头","画笔","文字","点标注","序号","云线","马赛克","实色遮盖","调整选区"){AccessibleName="默认标注工具"};
+        readonly string[] tools={"Rect","Ellipse","Line","Arrow","Pen","PenPath","Text","Callout","Counter","Cloud","Pixelate","Redact","Crop"};
+        readonly PreferencesChoice initial=new PreferencesChoice("矩形","椭圆","直线","箭头","画笔","钢笔","文字","点标注","序号","云线","马赛克","实色遮盖","调整选区"){AccessibleName="默认标注工具"};
         readonly PreferencesSwitch cursor=new PreferencesSwitch{AccessibleName="截图包含光标"},reverse=new PreferencesSwitch{AccessibleName="反向缩放滚轮"},wheel=new PreferencesSwitch{AccessibleName="普通滚轮调整透明度"},snap=new PreferencesSwitch{AccessibleName="贴图边缘吸附"},shadow=new PreferencesSwitch{AccessibleName="贴图阴影"},history=new PreferencesSwitch{AccessibleName="保留截图历史"};
         readonly NumericUpDown opacity=Number(20,100,100,"新贴图透明度"),zoom=Number(0,400,0,"新贴图缩放百分比，0 为适应屏幕"),border=Number(0,8,1,"贴图边框宽度"),radius=Number(0,60,10,"贴图圆角半径"),historyLimit=Number(10,500,100,"历史条数上限");
         readonly TextBox edgeColor=new TextBox{AccessibleName="贴图边框 HEX"},directory=new TextBox{AccessibleName="自动保存目录"},template=new TextBox{AccessibleName="保存文件名模板"};

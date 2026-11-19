@@ -1,4 +1,6 @@
-# ADR-001 — 采用 Stackshot 核心模块
+﻿# ADR-001 — 采用 Stackshot 核心模块
+
+> 历史决定。2026-11-09 起由 [0.10 内核重写](CORE_REWRITE.md) 取代；下文记录 0.9 及以前版本的来源。
 
 日期：2026-11-04。决定：以 **Stackshot** 为唯一主底座，保留原生 WinForms/WPF/C#；精简宿主，复用捕获、选区、标注画布、形状渲染、贴图及滚动拼接。不是从零实现截图引擎。
 
@@ -44,7 +46,7 @@
 
 ## 复用边界与风险
 
-- 复用文件在 `src/Upstream/Stackshot/`，版权头及根 LICENSE 保留；逐文件来源/哈希见 `docs/UPSTREAM_FILES.csv`。
+- 复用文件在 `src/Upstream/Stackshot/`，版权头及根 LICENSE 保留；逐文件来源/哈希见 `docs/UPSTREAM_FILES_0.9.4.csv`。
 - 原作者的宿主、联网更新、报告上传、Google OAuth、录屏输入钩子及角色素材未纳入编译与分发。没有 QQ 私有组件、Electron 或 WebView。
 - `Canvas` 的对象编辑、撤销、裁剪及 `Painter` 的基础几何/马赛克继续使用原实现，再增加样式、画笔、云线说明和工程格式。
 - 标注界面目前在选区确认后打开独立编辑器；与微信/QQ 在冻结遮罩内直接标注的交互仍有差距，不能将 M1 全部标为完成。

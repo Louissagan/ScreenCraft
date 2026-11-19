@@ -8,7 +8,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     // No Form.Show, desktop capture, global hotkey, clipboard or injected input in this suite.
     static class ScreenCraftTests
@@ -18,7 +18,7 @@ namespace Stackshot
         static readonly List<string> rows=new List<string>();
         [STAThread] static int Main(string[] arguments)
         {
-            Console.OutputEncoding=Encoding.UTF8; I18n.Apply("en"); Theme.Init();
+            Console.OutputEncoding=Encoding.UTF8; Theme.Init();
             output=Environment.GetEnvironmentVariable("SCREENCRAFT_TEST_OUTPUT")??Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"test-results");
             Directory.CreateDirectory(output);
             if(Array.IndexOf(arguments,"--ocr-probe")>=0)return NativeOcrProbe.Run(output);
@@ -39,6 +39,33 @@ namespace Stackshot
                 var hashes=new HashSet<string>();foreach(var dash in new[]{DashStyle.Solid,DashStyle.Dash,DashStyle.Dot,DashStyle.DashDot,DashStyle.DashDotDot}){var s=Mark(Tool.Rect,20,20,250,150);s.Dash=dash;using(var b=Render(s))hashes.Add(Hash(b));}Check(hashes.Count==5,"dash styles identical");
             });
             Run("ellipse/fill and outline render",delegate{var s=Mark(Tool.Ellipse,20,20,180,140);s.FillEnabled=true;s.FillColor=Color.Blue;using(var b=Render(s))Check(b.GetPixel(100,80).B>240&&b.GetPixel(100,80).R<20,"ellipse fill");});
+            Run("hatch/closed shapes keep open gaps and survive crop and reopening",delegate{
+                foreach(var kind in new[]{Tool.Rect,Tool.Ellipse,Tool.Cloud,Tool.Pen}){
+                    var shape=Mark(kind,43,39,253,173);
+                    shape.Color=Color.Teal;shape.FillEnabled=true;shape.HatchedFill=true;shape.FillColor=Color.FromArgb(140,shape.Color);
+                    shape.CornerRadius=17;shape.Rotation=19;
+                    if(kind==Tool.Pen){shape.ClosedPen=true;shape.Polygon=true;shape.Points=new List<PointF>{shape.A,new PointF(254,49),shape.B,new PointF(58,169)};}
+                    using(var image=Render(shape)){
+                        int white=0,tinted=0;
+                        for(int y=88;y<123;y++)for(int x=129;x<167;x++){
+                            var p=image.GetPixel(x,y);if(p.R==255&&p.G==255&&p.B==255)white++;else if(p.G>p.R+20)tinted++;
+                        }
+                        Check(white>300&&tinted>150&&image.GetPixel(10,10).ToArgb()==Color.White.ToArgb(),"striped fill missing or leaked: "+kind);
+                    }
+                    using(var canvas=new Canvas(White(360,240)){InPlaceViewport=true}){
+                        canvas.AddAnnotation(shape);
+                        var crop=new Rectangle(83,73,131,70);
+                        using(var full=canvas.Render())using(var expected=full.Clone(crop,PixelFormat.Format32bppArgb)){
+                            canvas.SetCaptureSelection(crop,false);
+                            using(var doc=canvas.ExportDocument()){
+                                var path=Path.Combine(output,"hatched-"+kind+".sccraft");doc.Save(path);
+                                using(var reopened=AnnotationDocument.Open(path))using(var actual=reopened.Render())
+                                    Check(reopened.Shapes[0].HatchedFill&&Hash(expected)==Hash(actual),"crop changed hatch alignment or reopen lost the pattern: "+kind);
+                            }
+                        }
+                    }
+                }
+            });
             Run("arrow/tapered and simple arrow render differently",delegate{var s=Mark(Tool.Arrow,30,30,210,130);using(var a=Render(s)){s.SimpleArrow=true;using(var b=Render(s))Check(Hash(a)!=Hash(b),"arrow style");}});
             Run("pen/clone and offset do not mutate undo source",delegate{var s=Mark(Tool.Pen,10,20,80,70);s.Points=new List<PointF>{new PointF(10,20),new PointF(40,60),new PointF(80,70)};var c=s.Clone();c.Offset(c,15,20);Check(s.Points[0]==new PointF(10,20),"aliased points");Check(c.Points[0]==new PointF(25,40),"pen offset");});
             Run("pen/canvas resize and undo transform every node",delegate{using(var c=NewCanvas()){var s=Mark(Tool.Pen,10,20,80,70);s.Points=new List<PointF>{s.A,new PointF(40,60),s.B};c.AddAnnotation(s);c.ResizeSelected(new RectangleF(20,40,140,100));Check(c.SelectedShape.Points[2]==new PointF(160,140),"resize endpoint");c.Undo();Check(c.AnnotationSnapshot[0].Points[2]==new PointF(80,70),"resize undo");}});
@@ -71,12 +98,17 @@ namespace Stackshot
             DailyWorkflowTests.Run(Run,Check,output);
             BoardTests.Run(Run,Check,output);
             DailySurfaceTests.Run(Run,Check,output);
+            CoreRewriteTests.Run(Run,Check,output);
+            CaptureTransitionTests.Run(Run,Check);
+            AnnotationTransformTests.Run(Run,Check,output);
+            NotificationAndSizingTests.Run(Run,Check,output);
+            PolygonDrawingTests.Run(Run,Check,output);
             Run("canvas/duplicate generates fresh IDs export remains editable",delegate{using(var c=NewCanvas()){c.AddAnnotation(Mark(Tool.Rect,20,20,160,100));c.DuplicateSelected();var list=c.AnnotationSnapshot;Check(list.Length==2&&list[0].Id!=list[1].Id,"duplicate ID");using(var doc=c.ExportDocument())Check(doc.Shapes.Length==2,"export");}});
             Run("editor/hidden control tree exposes full annotation controls",delegate{
                 using(var editor=new CraftEditor(White(600,400))){editor.CreateControl();Check(!editor.Visible,"editor became visible");var labels=new List<string>();CollectLabels(editor,labels);foreach(var name in new[]{"云线 W","画笔 B","钉在屏幕 P","线宽（px）","线型","圆角半径（px）","填充不透明度（%）","应用位置与大小","应用文字与序号"})Check(labels.Contains(name),"missing control: "+name);}
             });
             Run("editor/property controls change selected model and rendered pixels",delegate{
-                using(var editor=new CraftEditor(White(600,400))){var c=editor.AnnotationCanvas;c.AddAnnotation(Mark(Tool.Rect,30,30,180,150));var width=(NumericUpDown)FindControl(editor,"线宽（px）");width.Value=11;var round=(NumericUpDown)FindControl(editor,"圆角半径（px）");round.Value=25;var dash=(PreferencesChoice)FindControl(editor,"线型");dash.SelectedIndex=2;var fill=(CheckBox)FindControl(editor,"启用填充");fill.Checked=true;Check(c.SelectedShape.Width==11&&c.SelectedShape.CornerRadius==25&&c.SelectedShape.Dash==DashStyle.Dot&&c.SelectedShape.FillEnabled,"property events disconnected");using(var b=c.Render())Check(b.GetPixel(90,90).ToArgb()!=Color.White.ToArgb(),"no fill in output");}
+                using(var editor=new CraftEditor(White(600,400))){var c=editor.AnnotationCanvas;c.AddAnnotation(Mark(Tool.Rect,30,30,180,150));var width=(AnnotationSizeInput)FindControl(editor,"线宽（px）");width.Value=11;var round=(AnnotationSizeInput)FindControl(editor,"圆角半径（px）");round.Value=25;var dash=(PreferencesChoice)FindControl(editor,"线型");dash.SelectedIndex=2;var fill=(CheckBox)FindControl(editor,"启用填充");fill.Checked=true;Check(c.SelectedShape.Width==11&&c.SelectedShape.CornerRadius==25&&c.SelectedShape.Dash==DashStyle.Dot&&c.SelectedShape.FillEnabled,"property events disconnected");using(var b=c.Render())Check(b.GetPixel(90,90).ToArgb()!=Color.White.ToArgb(),"no fill in output");}
             });
             Run("editor/hidden layout reserves canvas and inspector space",delegate{
                 using(var editor=new CraftEditor(White(600,400))){editor.CreateControl();editor.PerformLayout();Check(editor.AnnotationCanvas.Width>600,"canvas crowded out");Check(editor.AnnotationCanvas.Height>500,"toolbar crowded out canvas");Check(!editor.Visible,"layout showed editor");var layout=new List<string>();CollectLayout(editor,layout);File.WriteAllLines(Path.Combine(output,"editor-layout-hidden.txt"),layout);}

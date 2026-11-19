@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public partial class Canvas
     {
@@ -15,11 +15,13 @@ namespace Stackshot
         void SetSingleSelection(Shape shape){nudged=null;selection.Clear();if(shape!=null)selection.Add(shape);}
         void ToggleSelection(Shape shape)
         {
-            nudged=null;if(selected!=null&&selection.Count==0)selection.Add(selected);
+            nudged=null;
+            if(!OnActiveLayer(selected))selection.Clear();
+            else if(selection.Count==0)selection.Add(selected);
             if(selection.Contains(shape))selection.Remove(shape);else selection.Add(shape);
             selected=selection.LastOrDefault();movingNote=false;movingCounterBadge=false;Invalidate();Fire(StateChanged);
         }
-        public void SelectAll(){CommitText();nudged=null;selection.Clear();selection.AddRange(shapes);selected=selection.LastOrDefault();movingNote=false;movingCounterBadge=false;Invalidate();Fire(StateChanged);}
+        public void SelectAll(){CommitText();nudged=null;selection.Clear();selection.AddRange(shapes.Where(OnActiveLayer));selected=selection.LastOrDefault();movingNote=false;movingCounterBadge=false;Invalidate();Fire(StateChanged);}
         internal RectangleF SelectedBounds{get{return GroupBounds();}}
         RectangleF GroupBounds(){var items=SelectedShapes;var r=Painter.Bounds(items[0]);foreach(var s in items.Skip(1))r=RectangleF.Union(r,Painter.Bounds(s));return r;}
         internal static PointF[] BoxHandles(RectangleF b){return new[]{new PointF(b.Left,b.Top),new PointF(b.Right,b.Top),new PointF(b.Right,b.Bottom),new PointF(b.Left,b.Bottom),new PointF(b.Left+b.Width/2,b.Top),new PointF(b.Right,b.Top+b.Height/2),new PointF(b.Left+b.Width/2,b.Bottom),new PointF(b.Left,b.Top+b.Height/2)};}
@@ -51,8 +53,10 @@ namespace Stackshot
             Func<PointF,PointF> map=p=>new PointF(to.X+(p.X-from.X)*sx,to.Y+(p.Y-from.Y)*sy);
             s.A=map(source.A);s.B=map(source.B);s.C=map(source.C);
             if(source.Points!=null)s.Points=source.Points.Select(map).ToList();
+            if(source.PathTangents!=null)s.PathTangents=source.PathTangents.ConvertAll(p=>new PointF(p.X*sx,p.Y*sy));
             s.NoteOffset=new PointF(source.NoteOffset.X*sx,source.NoteOffset.Y*sy);
             if(s.Kind==Tool.Text||Painter.HasNote(s.Kind)){s.NoteWidth=Math.Max(60,Math.Min(800,source.NoteWidth*sx));s.FontPx=Math.Max(8,Math.Min(300,source.FontPx*sy));if(source.NoteFontPx>0)s.NoteFontPx=Math.Max(8,Math.Min(300,source.NoteFontPx*sy));s.NoteHeight=Math.Min(10000,source.NoteHeight*sy);s.MarkerSize=Math.Min(200,source.MarkerSize*(sx+sy)/2);}
+            if(source.Rotation!=0){var expected=map(Painter.RotationCenter(source));var actual=Painter.RotationCenter(s);s.Offset(s,expected.X-actual.X,expected.Y-actual.Y);}
             s.DropCache();
         }
         void OutlineGroup(Graphics g){var b=GroupBounds();var frame=new Shape{Kind=Tool.Rect,A=b.Location,B=new PointF(b.Right,b.Bottom),Width=.25f};Outline(g,frame,true);}

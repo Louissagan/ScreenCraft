@@ -1,4 +1,4 @@
-// Opt-in live settings probe: uses shared offscreen painting; never reads the desktop or clipboard.
+﻿// Opt-in live settings probe: uses shared offscreen painting; never reads the desktop or clipboard.
 using System;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -7,7 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using Stackshot;
+using ScreenCraft;
 class OcrSettingsProbe
 {
     [DllImport("user32.dll")]static extern bool PrintWindow(IntPtr hwnd,IntPtr dc,uint flags);

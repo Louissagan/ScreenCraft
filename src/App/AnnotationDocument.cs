@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -6,7 +6,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Compression;
 using System.Web.Script.Serialization;
-namespace Stackshot
+namespace ScreenCraft
 {
     // Explicit editable files retain the original image. PNG export contains only flattened pixels.
     public sealed class AnnotationDocument : IDisposable
@@ -41,11 +41,16 @@ namespace Stackshot
         static bool PointOk(PointF p){return Finite(p.X)&&Finite(p.Y);}
         public static void ValidateShape(Shape s)
         {
-            if(s==null || string.IsNullOrEmpty(s.Id) || s.Id.Length>64 || !Enum.IsDefined(typeof(Tool),s.Kind) || s.Kind==Tool.Crop)throw new InvalidDataException("标注类型或 ID 无效。");
+            if(s==null || string.IsNullOrEmpty(s.Id) || s.Id.Length>64 || !Enum.IsDefined(typeof(Tool),s.Kind) || (s.Kind==Tool.Crop||s.Kind==Tool.PenPath))throw new InvalidDataException("标注类型或 ID 无效。");
             if(!PointOk(s.A)||!PointOk(s.B)||!PointOk(s.C)||!PointOk(s.NoteOffset))throw new InvalidDataException("标注坐标无效。");
             if(!Finite(s.Width)||s.Width<.25||s.Width>128||!Finite(s.FontPx)||s.FontPx<8||s.FontPx>300||!Finite(s.CornerRadius)||s.CornerRadius<0||s.CornerRadius>1000)throw new InvalidDataException("线宽、圆角或字号超出范围。");
             if(s.Dash<DashStyle.Solid || s.Dash>DashStyle.DashDotDot || !Finite(s.NoteWidth)||s.NoteWidth<60||s.NoteWidth>800 || s.Number<0||s.Number>99999)throw new InvalidDataException("线型、序号或说明宽度无效。");
             if(!Finite(s.NoteHeight)||s.NoteHeight<0||s.NoteHeight>10000||!Finite(s.MarkerSize)||s.MarkerSize<0||s.MarkerSize>200||!Finite(s.EffectOpacity)||s.EffectOpacity<0||s.EffectOpacity>95)throw new InvalidDataException("文字框或标记大小无效。");
+            if(!Finite(s.Rotation)||s.Rotation<0||s.Rotation>=360)throw new InvalidDataException("旋转角度无效。可用范围为 0–360 度（不含 360）。");
+            if(s.Polygon&&(s.Kind!=Tool.Pen||!s.ClosedPen||s.Points==null||s.Points.Count<3))throw new InvalidDataException("多边形至少需要三个锚点并闭合。");
+            if(!s.PatternSettings.IsValid)throw new InvalidDataException("填充图案参数无效。");
+            if(s.PathTangents!=null&&(!s.Polygon||s.Points==null||s.PathTangents.Count!=s.Points.Count||s.PathTangents.Exists(p=>!PointOk(p))))throw new InvalidDataException("钢笔控制柄无效。");
+            if(s.PathWidths!=null&&(!s.Polygon||s.Points==null||s.PathWidths.Count!=s.Points.Count||s.PathWidths.Exists(v=>!Finite(v)||v<0||v>128)))throw new InvalidDataException("钢笔线段宽度无效。");
             if(s.Text!=null && s.Text.Length>20000)throw new InvalidDataException("文字过长。");
             if(s.Points!=null){if(s.Points.Count>50000)throw new InvalidDataException("画笔节点过多。");foreach(var p in s.Points)if(!PointOk(p))throw new InvalidDataException("画笔节点无效。");}
             if(s.RedactionMode<0||s.RedactionMode>2||!Finite(s.WatermarkAngle)||s.WatermarkAngle< -90||s.WatermarkAngle>90||!Finite(s.WatermarkSpacing)||s.WatermarkSpacing<20||s.WatermarkSpacing>600)throw new InvalidDataException("模糊或水印参数无效。");
@@ -93,24 +98,30 @@ namespace Stackshot
         public sealed class ShapeDto
         {
             public string Id,Text; public int Kind,Color,FillColor,Dash,Number,Weight,MosaicBlock;public float Width,FontPx,Radius,NoteWidth,NoteHeight,MarkerSize,EffectOpacity;
-            public bool FillEnabled,SimpleArrow,Curved;public float[] A,B,C,NoteOffset,Points;
+            public float Rotation;public bool ClosedPen,Polygon;public bool FillEnabled,HatchedFill,TransparentText,SimpleArrow,Curved;public float[] A,B,C,NoteOffset,Points,Tangents,PathWidths;public int FillPattern,FillSpacing,FillStrokePercent;
             public bool HasNoteTextColor;public int NoteTextColor;public float NoteFontPx;public bool NoteAutoWidth,TextWrap,LeaderCounter,SmoothPen,FreehandArrow,ArrowWhiteOutline;public int RedactionMode;public float WatermarkAngle,WatermarkSpacing;
             static float[] Pair(PointF p){return new[]{p.X,p.Y};}
             static PointF ReadPair(float[] p){if(p==null||p.Length!=2)throw new InvalidDataException("坐标损坏。");return new PointF(p[0],p[1]);}
             public static ShapeDto From(Shape s)
             {
                 var dto=new ShapeDto{Id=s.Id,Text=s.Text,Kind=(int)s.Kind,Color=s.Color.ToArgb(),FillColor=s.FillColor.ToArgb(),Dash=(int)s.Dash,Number=s.Number,Weight=s.Weight,Width=s.Width,FontPx=s.FontPx,Radius=s.CornerRadius,NoteWidth=s.NoteWidth,FillEnabled=s.FillEnabled,SimpleArrow=s.SimpleArrow,Curved=s.Curved,A=Pair(s.A),B=Pair(s.B),C=Pair(s.C),NoteOffset=Pair(s.NoteOffset)};
-                dto.MosaicBlock=s.MosaicBlock;dto.NoteHeight=s.NoteHeight;dto.MarkerSize=s.MarkerSize;dto.EffectOpacity=s.EffectOpacity;
+                dto.TransparentText=s.TransparentText;dto.HatchedFill=s.HatchedFill;dto.Rotation=s.Rotation;dto.ClosedPen=s.ClosedPen;dto.Polygon=s.Polygon;dto.MosaicBlock=s.MosaicBlock;dto.NoteHeight=s.NoteHeight;dto.MarkerSize=s.MarkerSize;dto.EffectOpacity=s.EffectOpacity;
                 dto.HasNoteTextColor=s.HasNoteTextColor;dto.NoteTextColor=s.NoteTextColor.ToArgb();dto.NoteFontPx=s.NoteFontPx;dto.NoteAutoWidth=s.NoteAutoWidth;dto.TextWrap=s.TextWrap;dto.LeaderCounter=s.LeaderCounter;dto.SmoothPen=s.SmoothPen;dto.FreehandArrow=s.FreehandArrow;dto.ArrowWhiteOutline=s.ArrowWhiteOutline;dto.RedactionMode=s.RedactionMode;dto.WatermarkAngle=s.WatermarkAngle;dto.WatermarkSpacing=s.WatermarkSpacing;
                 if(s.Points!=null){dto.Points=new float[s.Points.Count*2];for(int i=0;i<s.Points.Count;i++){dto.Points[i*2]=s.Points[i].X;dto.Points[i*2+1]=s.Points[i].Y;}}
+                if(s.PathTangents!=null){dto.Tangents=new float[s.PathTangents.Count*2];for(int i=0;i<s.PathTangents.Count;i++){dto.Tangents[i*2]=s.PathTangents[i].X;dto.Tangents[i*2+1]=s.PathTangents[i].Y;}}
+                if(s.PathWidths!=null)dto.PathWidths=s.PathWidths.ToArray();
+                dto.FillPattern=(int)s.FillPattern;dto.FillSpacing=s.FillSpacing;dto.FillStrokePercent=s.FillStrokePercent;
                 return dto;
             }
             public Shape ToShape()
             {
                 var s=new Shape{Id=Id,Text=Text,Kind=(Tool)Kind,Color=System.Drawing.Color.FromArgb(Color),FillColor=System.Drawing.Color.FromArgb(FillColor),Dash=(DashStyle)Dash,Number=Number,Weight=Math.Max(0,Math.Min(2,Weight)),Width=Width,FontPx=FontPx,CornerRadius=Radius,NoteWidth=NoteWidth,FillEnabled=FillEnabled,SimpleArrow=SimpleArrow,Curved=Curved,A=ReadPair(A),B=ReadPair(B),C=ReadPair(C),NoteOffset=ReadPair(NoteOffset)};
-                s.MosaicBlock=MosaicBlock;s.NoteHeight=NoteHeight;s.MarkerSize=MarkerSize;s.EffectOpacity=EffectOpacity;
+                s.TransparentText=TransparentText;s.HatchedFill=HatchedFill;s.Rotation=Rotation;s.ClosedPen=ClosedPen;s.Polygon=Polygon;s.MosaicBlock=MosaicBlock;s.NoteHeight=NoteHeight;s.MarkerSize=MarkerSize;s.EffectOpacity=EffectOpacity;
                 s.HasNoteTextColor=HasNoteTextColor;s.NoteTextColor=System.Drawing.Color.FromArgb(NoteTextColor);s.NoteFontPx=NoteFontPx;s.NoteAutoWidth=NoteAutoWidth;s.TextWrap=TextWrap;s.LeaderCounter=LeaderCounter;s.SmoothPen=SmoothPen;s.FreehandArrow=FreehandArrow;s.ArrowWhiteOutline=ArrowWhiteOutline;s.RedactionMode=RedactionMode;s.WatermarkAngle=WatermarkAngle;s.WatermarkSpacing=WatermarkSpacing==0?100:WatermarkSpacing;
                 if(Points!=null){if(Points.Length%2!=0||Points.Length>100000)throw new InvalidDataException("画笔节点损坏。");s.Points=new List<PointF>();for(int i=0;i<Points.Length;i+=2)s.Points.Add(new PointF(Points[i],Points[i+1]));}
+                if(Tangents!=null){if(Tangents.Length%2!=0||Tangents.Length>100000)throw new InvalidDataException("钢笔控制柄损坏。");s.PathTangents=new List<PointF>();for(int i=0;i<Tangents.Length;i+=2)s.PathTangents.Add(new PointF(Tangents[i],Tangents[i+1]));}
+                if(PathWidths!=null)s.PathWidths=new List<float>(PathWidths);
+                s.FillPattern=(FillPatternKind)FillPattern;s.FillSpacing=FillSpacing;s.FillStrokePercent=FillStrokePercent;
                 ValidateShape(s);return s;
             }
         }

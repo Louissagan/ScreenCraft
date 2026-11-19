@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public partial class RegionPicker
     {
@@ -42,6 +42,6 @@ namespace Stackshot
         }
         void ClearSmartHover(){smartVersion++;smartWindow=IntPtr.Zero;smartChoices=new Rectangle[0];if(smartTimer!=null)smartTimer.Stop();}
         void DisposeSmartRegions(){ClearSmartHover();if(smartTimer!=null){smartTimer.Dispose();smartTimer=null;}}
-        protected override void Dispose(bool disposing){if(disposing)DisposeSmartRegions();base.Dispose(disposing);}
+        protected override void Dispose(bool disposing){if(disposing){DisposeSmartRegions();ReleasePixels();}base.Dispose(disposing);}
     }
 }

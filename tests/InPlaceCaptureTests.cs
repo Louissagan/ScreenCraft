@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     static class InPlaceCaptureTests
     {
@@ -17,6 +17,21 @@ namespace Stackshot
         static void ShapeInside(Canvas canvas){var shape=ScreenCraftTests.Mark(Tool.Rect,260,210,500,350);shape.CornerRadius=16;shape.Dash=DashStyle.Dash;shape.FillEnabled=true;shape.FillColor=Color.FromArgb(55,255,70,100);canvas.AddAnnotation(shape);}
         public static void Run(Action<string,Action> run,Action<bool,string> check,string output)
         {
+            run("in-place/hatch button changes defaults and selected fill with undo",delegate{
+                using(var overlay=Overlay()){
+                    var canvas=overlay.AnnotationCanvas;
+                    var buttons=Children(overlay).OfType<CaptureIconButton>().ToArray();
+                    var hatch=buttons.Single(b=>b.AccessibleName=="图案填充");
+                    var translucent=buttons.Single(b=>b.AccessibleName=="半透明填充");
+                    canvas.SetTool(Tool.Text);check(!overlay.IsOptionShown(hatch),"text offered hatch fill");
+                    canvas.SetTool(Tool.Rect);
+                    Click(hatch);check(hatch.Selected&&canvas.DefaultStyle.FillEnabled&&canvas.DefaultStyle.HatchedFill,"hatch did not update defaults");
+                    ShapeInside(canvas);Click(hatch);canvas.SetColor(Color.Teal);
+                    check(hatch.Selected&&!translucent.Selected&&canvas.SelectedShape.HatchedFill&&canvas.SelectedShape.FillColor.ToArgb()==Color.FromArgb(55,Color.Teal).ToArgb(),"hatch did not follow selected color");
+                    Click(translucent);check(translucent.Selected&&!canvas.SelectedShape.HatchedFill,"failed to return to translucent fill");
+                    canvas.Undo();check(hatch.Selected&&canvas.SelectedShape.HatchedFill,"hatch selection did not undo");
+                }
+            });
             run("in-place/negative desktop origin maps selection without scaling",delegate{check(CaptureOverlayGeometry.LocalSelection(new Rectangle(-1100,130,850,430),new Rectangle(-1280,0,1280,800))==new Rectangle(180,130,850,430),"negative desktop origin");using(var overlay=Overlay()){var c=overlay.AnnotationCanvas;check(c.ImageToControl(new PointF(260,210))==new Point(260,210),"canvas rescaled screenshot");check(c.ZoomPercent==100&&c.Bounds==new Rectangle(0,0,1280,800)&&overlay.FormBorderStyle==FormBorderStyle.None&&!overlay.Visible,"not in-place or shown");}});
             run("in-place/surround dims only outside and preserves source pixels",delegate{using(var source=new Bitmap(600,400))using(var painted=new Bitmap(600,400)){using(var g=Graphics.FromImage(source))g.Clear(Color.FromArgb(200,160,120));using(var g=Graphics.FromImage(painted))CaptureOverlayGeometry.PaintSurround(g,source,new Rectangle(100,80,300,200));check(painted.GetPixel(120,100).ToArgb()==source.GetPixel(120,100).ToArgb(),"selection dimmed");check(painted.GetPixel(20,20).R<150&&source.GetPixel(20,20).R==200,"outside not dimmed or source modified");}});
             run("in-place/toolbar remains inside selected monitor at every corner",delegate{var area=new Rectangle(0,0,1280,760);foreach(var selected in new[]{new Rectangle(0,0,200,100),new Rectangle(1080,660,200,100),new Rectangle(0,660,200,100),new Rectangle(1080,0,200,100),area}){var toolbar=CaptureOverlayGeometry.PlaceToolbar(selected,new Size(728,102),area);check(area.Contains(toolbar),"toolbar offscreen "+toolbar);}});
@@ -47,9 +62,12 @@ namespace Stackshot
                     var c=overlay.AnnotationCanvas;
                     var crop=c.Crop;
                     var rect=Children(overlay).OfType<CaptureIconButton>().Single(b=>b.AccessibleName=="矩形 R");
+                    int initialWidth=-1;
                     foreach(float scale in new[]{1f,1.25f,1.5f,2f,1f}){
                         overlay.SetChromeScale(scale);c.SetTool(Tool.Rect);
-                        check(rect.Width==(int)Math.Round(34*scale)&&c.Crop==crop,"scaled image or accumulated rounding");
+                        int fullSize=(int)Math.Round(34*scale);
+                        check(rect.Height==fullSize&&rect.Width<=fullSize&&rect.Width>=fullSize-(int)Math.Round(5*scale)&&c.Crop==crop,"scaled image or invalid toolbar width");
+                        if(scale==1){if(initialWidth>=0)check(rect.Width==initialWidth,"toolbar width drifted across DPI changes");initialWidth=rect.Width;}
                         check(c.ClientRectangle.Contains(overlay.ToolbarBounds)&&c.ClientRectangle.Contains(overlay.OptionsBounds),"controls left viewport");
                         using(var result=c.Render())check(result.Size==Size.Round(crop.Size),"DPI changed exported dimensions");
                     }

@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-namespace Stackshot
+namespace ScreenCraft
 {
     public sealed partial class CaptureOverlay
     {
@@ -10,7 +10,7 @@ namespace Stackshot
         internal StyledMenu PrepareColorMenu()
         {
             if(colorPopup==null)colorPopup=new ColorPopup(swatch);
-            colorMenu=colorPopup.Prepare(PaletteColor,delegate(Color color){ExecuteCommand(delegate{ApplyAnnotationColor(color);});},delegate{canvas.BeginColorPick(ApplySampledColor);canvas.Focus();});
+            colorMenu=colorPopup.Prepare(PaletteColor,delegate(Color color){ExecuteCommand(delegate{canvas.ChooseAnnotationColor(color);});},delegate{canvas.BeginColorPick(ApplySampledColor);canvas.Focus();});
             palette=colorPopup.Palette;return colorMenu;
         }
         void ShowColors(){PrepareColorMenu();colorPopup.Show();}
