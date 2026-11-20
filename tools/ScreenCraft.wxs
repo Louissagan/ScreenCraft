@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="$(var.ProductName)" Manufacturer="ScreenCraft" Language="2052"
+  <Product Id="*" Name="$(var.ProductName)" Manufacturer="ScreenCraft" Language="2052" Codepage="936"
            Version="$(var.Version)" UpgradeCode="$(var.UpgradeCode)">
     <Package Platform="x64" InstallerVersion="500" InstallScope="perUser" InstallPrivileges="limited"
              Compressed="yes" Description="ScreenCraft 当前用户安装" />
@@ -58,8 +58,6 @@
     <Feature Id="Main" Title="ScreenCraft" Level="1" Absent="disallow">
       <ComponentGroupRef Id="CurrentUserApplication" />
     </Feature>
-    <UIRef Id="WixUI_Minimal" />
-    <WixVariable Id="WixUILicenseRtf" Value="$(var.Root)\tools\installer-license.rtf" />
   </Product>
 
   <Fragment>
@@ -86,8 +84,6 @@
         <File Source="$(var.Payload)\ScreenCraft.exe.config" />
         <File Source="$(var.Root)\LICENSE" />
         <File Source="$(var.Root)\THIRD_PARTY_NOTICES.md" />
-        <File Source="$(var.Root)\src\Assets\COLORBREWER_LICENSE.txt" />
-        <File Source="$(var.Root)\src\Assets\WIX_LICENSE.txt" />
         <File Source="$(var.Root)\docs\USER_GUIDE.md" />
         <File Source="$(var.Root)\docs\KNOWN_LIMITATIONS.md" />
         <RemoveFolder Id="DeleteEmptyAppDirectory" On="uninstall" />

@@ -31,7 +31,17 @@ if(($wordCount -band 8) -eq 0 -or $properties.ContainsKey('ALLUSERS')){throw 'In
 if(@($registry | Where-Object {$_[0] -ne '1'}).Count -gt 0){throw 'Installer writes outside HKCU'}
 if(@($remove | Where-Object {![string]::IsNullOrEmpty($_[1])}).Count -gt 0){throw 'Installer contains broad deletion entries'}
 if($properties.LAUNCHAPP -ne '0' -or $properties.REMOVEUSERDATA -ne '0' -or $properties.MSIRESTARTMANAGERCONTROL -ne 'Disable'){throw 'Unexpected launch cleanup or process-control defaults'}
-if($shortcuts.Count -ne 2 -or $files.Count -ne 8){throw 'Unexpected payload or shortcut count'}
+$version=[version]$properties.ProductVersion
+$expectedFiles=@('ScreenCraft.exe','ScreenCraft.exe.config','LICENSE','THIRD_PARTY_NOTICES.md','USER_GUIDE.md','KNOWN_LIMITATIONS.md')
+if($version -lt [version]'0.10.10'){$expectedFiles+=@('COLORBREWER_LICENSE.txt','WIX_LICENSE.txt')}
+$actualFiles=@($files | ForEach-Object {($_[1] -split '\|')[-1]})
+if($shortcuts.Count -ne 2 -or @(Compare-Object $expectedFiles $actualFiles).Count -ne 0){throw 'Unexpected payload or shortcuts'}
+if($version -ge [version]'0.10.10'){
+ $tables=@([ScreenCraftMsiRead]::Query($path,'SELECT `Name` FROM `_Tables`') | ForEach-Object {$_[0]})
+ if(@($tables | Where-Object {$_ -in 'Dialog','Control','Binary','ControlEvent','EventMapping'}).Count -ne 0){throw 'Installer includes an embedded third-party dialog or binary table'}
+ if(@($actions | Where-Object {$_[0] -notin 'CloseInstalledInstance','CleanupOwnedStartup','CleanupOwnedCache','LaunchApp'}).Count -ne 0){throw 'Unexpected custom action'}
+ Write-Output 'PASS MSI uses the Windows Installer interface and contains only the ScreenCraft payload'
+}
 if(!($conditions | Where-Object {$_[0] -eq 'NOT ALLUSERS'})){throw 'ALLUSERS override is not blocked'}
 $ownActions=@($actions | Where-Object {$_[0] -in @('CloseInstalledInstance','CleanupOwnedStartup','CleanupOwnedCache')})
 if($ownActions.Count -ne 3 -or @($ownActions | Where-Object {([int]$_[1] -band 2048) -ne 0}).Count -gt 0){throw 'Uninstall actions must impersonate the current user'}

@@ -9,8 +9,6 @@ $portable=Join-Path $stage 'ScreenCraft-Portable'
 New-Item -ItemType Directory -Force $dist,$portable,(Join-Path $portable 'Data') | Out-Null
 Copy-Item (Join-Path $root 'bin\Release\ScreenCraft.exe'),(Join-Path $root 'bin\Release\ScreenCraft.exe.config'),(Join-Path $root 'LICENSE'),(Join-Path $root 'NOTICE'),(Join-Path $root 'THIRD_PARTY_NOTICES.md') -Destination $portable
 Copy-Item (Join-Path $root 'docs\USER_GUIDE.md'),(Join-Path $root 'docs\KNOWN_LIMITATIONS.md') -Destination $portable
-Copy-Item -LiteralPath (Join-Path $root 'src\Assets\COLORBREWER_LICENSE.txt') -Destination (Join-Path $portable 'COLORBREWER_LICENSE.txt')
-Copy-Item -LiteralPath (Join-Path $root 'src\Assets\WIX_LICENSE.txt') -Destination (Join-Path $portable 'WIX_LICENSE.txt')
 Set-Content -LiteralPath (Join-Path $portable 'portable.flag') -Value 'ScreenCraft portable mode'
 Set-Content -LiteralPath (Join-Path $portable 'Data\README.txt') -Value 'Preferences are written here when the user saves settings. Startup entries remain per machine/user.'
 $zip=Join-Path $dist 'ScreenCraft-Portable-win-x64.zip'

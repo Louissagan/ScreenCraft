@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.10 development preview — 2026-11-20
+
+- 移除 MSI 内嵌的 WiX 标准安装界面，使用 Windows Installer 的基础进度窗口。历史许可证继续随源码保存。
+- 构建验证核对安装包和便携包的载荷，并确认 MSI 没有内嵌对话框或第三方二进制表。
+
 ## 0.10.9 development preview — 2026-11-19
 
 - 重新实现 MSI 安装定义及打包流程，保留现有的每用户安装路径与升级标识。

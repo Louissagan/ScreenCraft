@@ -13,7 +13,12 @@ try{
  try{$archiveHash=([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-','')}finally{$stream.Dispose();$sha.Dispose()}
  if($archiveHash -ne (Get-FileHash (Join-Path $dist 'ScreenCraft.exe')).Hash){throw 'Portable binary does not match published binary'}
  foreach($file in 'ScreenCraft.exe.config','portable.flag','LICENSE','THIRD_PARTY_NOTICES.md','USER_GUIDE.md','KNOWN_LIMITATIONS.md'){if(!$zip.GetEntry('ScreenCraft-Portable/'+$file)){throw "Missing $file"}}
- if([Version](Get-Item (Join-Path $dist 'ScreenCraft.exe')).VersionInfo.FileVersion -ge [Version]'0.8.0.0' -and !$zip.GetEntry('ScreenCraft-Portable/COLORBREWER_LICENSE.txt')){throw 'ColorBrewer license missing'}
+ $portableVersion=[version](Get-Item (Join-Path $dist 'ScreenCraft.exe')).VersionInfo.FileVersion
+ if($portableVersion -ge [version]'0.10.10'){
+  $expected=@('ScreenCraft.exe','ScreenCraft.exe.config','portable.flag','LICENSE','NOTICE','THIRD_PARTY_NOTICES.md','USER_GUIDE.md','KNOWN_LIMITATIONS.md','Data/README.txt')
+  $actual=@($zip.Entries | Where-Object {$_.Name} | ForEach-Object {$_.FullName.Substring('ScreenCraft-Portable/'.Length)})
+  if(@(Compare-Object $expected $actual).Count -ne 0){throw 'Unexpected portable payload'}
+ }elseif($portableVersion -ge [version]'0.8.0.0' -and !$zip.GetEntry('ScreenCraft-Portable/COLORBREWER_LICENSE.txt')){throw 'ColorBrewer license missing'}
 }finally{$zip.Dispose()}
 foreach($line in Get-Content (Join-Path $dist 'SHA256SUMS.txt')){if($line -match '^([a-f0-9]{64})  (.+)$'){if((Get-FileHash -LiteralPath (Join-Path $dist $Matches[2]) -Algorithm SHA256).Hash -ne $Matches[1]){throw "Hash mismatch: $($Matches[2])"}}else{throw 'Invalid checksum line'}}
 $sourceZip=[IO.Compression.ZipFile]::OpenRead((Join-Path $dist 'ScreenCraft-Source.zip'))

@@ -34,6 +34,7 @@ try{
  Run-Msi @('/i',('"'+$msi+'"'),'/qn','/norestart','/l*v',('"'+(Join-Path $output 'upgrade.log')+'"'))
  $new=(Get-ItemProperty $testKey);$code=$new.ProductCode
  Check 'major upgrade replaces registration and preserves saved image and settings' ($new.InstalledVersion -eq '0.9.1' -and (Test-Path (Join-Path $app 'user-saved.png')) -and (Test-Path (Join-Path $app 'Data/settings.json')))
+ Check 'upgrade removes obsolete package-owned sidecars' (!(Test-Path (Join-Path $app 'COLORBREWER_LICENSE.txt')) -and !(Test-Path (Join-Path $app 'WIX_LICENSE.txt')))
  Check 'upgraded payload matches the current executable at the registered path' ((Get-FileHash (Join-Path $app 'ScreenCraft.exe')).Hash -eq (Get-FileHash (Join-Path $root 'bin/Release/ScreenCraft.exe')).Hash)
  Run-Msi @('/i',('"'+$previous+'"'),'/qn','/norestart','/l*v',('"'+(Join-Path $output 'downgrade.log')+'"')) 1603
  Check 'downgrade is blocked and leaves the upgraded product registered' ((Get-ItemProperty $testKey).ProductCode -eq $code)

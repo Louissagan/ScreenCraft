@@ -50,4 +50,8 @@ Windows OCR 调用依据 [Microsoft API 文档](https://learn.microsoft.com/en-u
 - 画布装饰层、文字输入控制、标注导出、控制点与引线命中改用项目共享实现。重写 DIB 初始化，并移出依赖旧版 Stackshot 程序集的基线探针。
 - 早期来源记录与许可证仍随仓库保留。此比对覆盖已知上游修订，不能识别所有形式的改写或证明与任何第三方项目完全无关。
 
-MSI 仍使用 WiX 的标准构建工具和对话框，运行时仍使用 Windows API 和本机 OCR。安装顺序依据 [Windows Installer 卸载条件](https://learn.microsoft.com/en-us/windows/win32/msi/conditioning-actions-to-run-during-removal) 和 [升级顺序](https://learn.microsoft.com/en-us/windows/win32/msi/removeexistingproducts-action)。
+0.10.9 的 MSI 使用 WiX 的标准构建工具和对话框，运行时使用 Windows API 和本机 OCR。安装顺序依据 [Windows Installer 卸载条件](https://learn.microsoft.com/en-us/windows/win32/msi/conditioning-actions-to-run-during-removal) 和 [升级顺序](https://learn.microsoft.com/en-us/windows/win32/msi/removeexistingproducts-action)。
+
+## 0.10.10 安装包
+
+MSI 移除 WiX 标准对话框和扩展库链接，改用目标系统自带的 Windows Installer。WiX 编译器和链接器仅用于构建。发布检查核对 MSI 和便携 ZIP 的文件清单，并确认 MSI 没有嵌入的界面或二进制表。历史许可证随源码保留。

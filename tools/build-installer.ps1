@@ -61,7 +61,7 @@ $definitions=@($install.GetEnumerator() | Sort-Object Key | ForEach-Object { '-d
 if($LASTEXITCODE -ne 0){throw 'Could not compile the ScreenCraft installer definition.'}
 
 # The application lives in the user profile and the two links refer to its registered file.
-& (Join-Path $tools 'light.exe') -nologo -ext WixUIExtension -spdb -sice:ICE91 -sice:ICE61 -sice:ICE69 -sice:ICE90 -cultures:zh-CN -out $linkedPackage $object
+& (Join-Path $tools 'light.exe') -nologo -spdb -sice:ICE91 -sice:ICE61 -sice:ICE69 -sice:ICE90 -out $linkedPackage $object
 if($LASTEXITCODE -ne 0){throw 'Could not link the ScreenCraft installer.'}
 $destination=Join-Path $dist $filename
 Copy-Item -LiteralPath $linkedPackage -Destination $destination -Force

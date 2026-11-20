@@ -14,7 +14,7 @@
 
 ## 使用
 
-支持 Windows 10 / 11（64 位），需要 .NET Framework 4.8。当前源码版本为 0.10.9 开发预览版。
+支持 Windows 10 / 11（64 位），需要 .NET Framework 4.8。当前源码版本为 0.10.10 开发预览版。
 
 启动后程序会留在系统托盘：
 
@@ -50,4 +50,4 @@ cd ScreenCraft
 
 ## 许可证
 
-ScreenCraft 的应用代码采用 [MIT 许可证](LICENSE)。0.10 已替换早期使用的 Stackshot 运行时源码，0.10.9 重写了安装定义和打包脚本。历史版本的来源和版权声明继续保留。第三方材料与构建工具的许可见 [第三方声明](THIRD_PARTY_NOTICES.md)，内核变更见 [重写记录](docs/CORE_REWRITE.md)。
+ScreenCraft 的应用代码采用 [MIT 许可证](LICENSE)。0.10 已替换早期使用的 Stackshot 运行时源码，0.10.9 重写了安装定义和打包脚本。0.10.10 移除了 MSI 内嵌的 WiX 安装界面，安装进度由 Windows Installer 提供。历史版本的来源和版权声明继续保留。第三方材料与构建工具的许可见 [第三方声明](THIRD_PARTY_NOTICES.md)，内核变更见 [重写记录](docs/CORE_REWRITE.md)。

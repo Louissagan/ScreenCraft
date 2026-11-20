@@ -18,7 +18,7 @@
 .\tools\verify-package.ps1 -DistributionDirectory dist/0.10.0 -Rebuild
 ```
 
-发布脚本生成便携 ZIP、每用户 MSI、源码 ZIP 和 SHA-256 校验文件。首次构建 MSI 时会下载并校验 WiX 3.14.1；运行应用不需要 WiX。
+发布脚本生成便携 ZIP、每用户 MSI、源码 ZIP 和 SHA-256 校验文件。首次构建 MSI 时会下载并校验 WiX 3.14.1；WiX 只用于编译和链接 MSI。MSI 和便携包均不内嵌 WiX 安装界面或第三方可执行文件。
 
 本机配置、截图历史、编译产物和运行日志不提交到 Git。测试证据会在本机生成，历史开发报告中的 `docs/evidence/` 链接指这些本地记录。
 

@@ -2,12 +2,12 @@
 
 ## 当前用户 MSI
 
-运行发行目录的 ScreenCraft-Setup-PerUser-win-x64.msi。默认安装到当前用户 LocalAppData/Programs/ScreenCraft，在当前用户开始菜单创建 ScreenCraft 和设置入口。不申请管理员权限，不写系统级安装目录，不启用自启，也不自动运行应用。
+在发行目录中运行下方命令。安装使用 Windows Installer 的基础进度窗口；运行命令即开始当前用户安装。默认安装到当前用户 LocalAppData/Programs/ScreenCraft，在当前用户开始菜单创建 ScreenCraft 和设置入口。不申请管理员权限，不写系统级安装目录，不启用自启，也不自动运行应用。
 
 安装完成后从开始菜单打开 ScreenCraft；短暂提示后驻留托盘。登录后启动由常规设置主动开启。更新前先从旧版托盘退出，保存未完成画板。重复启动不能替换已经运行的旧进程。
 
 ~~~powershell
-msiexec /i ScreenCraft-Setup-PerUser-win-x64.msi
+msiexec /i ScreenCraft-Setup-PerUser-win-x64.msi /qb /norestart
 # 静默安装；应用和启动项仍默认关闭
 msiexec /i ScreenCraft-Setup-PerUser-win-x64.msi /qn /norestart
 ~~~
@@ -32,4 +32,4 @@ msiexec /x ScreenCraft-Setup-PerUser-win-x64.msi
 
 应用使用目标 Windows 已有的 .NET Framework 4.8；OCR 需要本地已安装语言包，不自动下载。MSI 构建工具 WiX 仅为开发依赖，目标机器不需要它。
 
-本次实际运行了隔离产品的静默安装/升级/卸载，完整生产向导、标准账户令牌、登录自启、实际卸载窗口交互仍 NOT RUN。安装包未代码签名，SmartScreen/组织策略放行未验收。发行文件附 SHA-256，不绕过系统策略。
+验证采用隔离产品，覆盖安装、升级、降级拦截和卸载。真实账户的登录自启和生产安装包的卸载窗口交互未在隔离试验中运行。安装包未代码签名，SmartScreen/组织策略放行未验收。发行文件附 SHA-256，不绕过系统策略。
